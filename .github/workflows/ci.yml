@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches: [ "**" ]
+
+env:
+  RUST_LOG: debug
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  ci:
+    name: CI
+
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Docker compose
+        run: docker compose up -d
+
+      - name: Setup cargo cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ci-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Setup rust
+        run: |
+          rustup self update
+          rustup toolchain install
+          rustup toolchain install nightly --component rustfmt
+
+      - name: Cargo fmt
+        run: cargo +nightly fmt --all --check
+
+      - name: Cargo clippy
+        run: cargo clippy --release
+
+      - name: Cargo clippy all features
+        run: cargo clippy --release --all-features
+
+      - name: Cargo test
+        run: cargo test --release -- --nocapture
+
+      - name: Cargo doc
+        run: cargo doc --all

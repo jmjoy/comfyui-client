@@ -1,0 +1,5 @@
+services:
+  comfyui:
+    image: obeliks/comfyui:master-cpu
+    ports:
+      - "8188:8188"
