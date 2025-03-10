@@ -3,7 +3,7 @@
 #![doc = include_str!("../README.md")]
 
 /// Module containing error definitions.
-mod errors;
+pub mod errors;
 /// Module containing metadata such as prompt and file information.
 pub mod meta;
 
@@ -74,7 +74,7 @@ impl ClientBuilder {
         let http_client = reqwest::Client::new();
         let client_id = Uuid::new_v4().to_string();
 
-        let (msg_tx, msg_rx) = mpsc::channel(self.channel_bound);
+        let (ev_tx, ev_rx) = mpsc::channel(self.channel_bound);
 
         let ws_url = Self::generate_websocket_url(base_url.clone(), &client_id)?;
         let (stream, _) = if ws_url.scheme() == "wss" {
@@ -105,17 +105,17 @@ impl ClientBuilder {
         let stream_handle = tokio::spawn(async move {
             let (_, mut read_stream) = stream.split();
             while let Some(msg) = read_stream.next().await {
-                let msg = EventStream::handle_message(msg);
-                let Some(msg) = msg.transpose() else {
+                let ev = EventStream::handle_message(msg);
+                let Some(ev) = ev.transpose() else {
                     continue;
                 };
-                if msg_tx.send(msg).await.is_err() {
+                if ev_tx.send(ev).await.is_err() {
                     break;
                 }
             }
         });
 
-        let rx_stream = ReceiverStream::new(msg_rx);
+        let rx_stream = ReceiverStream::new(ev_rx);
 
         let client = ComfyUIClient {
             base_url,
@@ -416,7 +416,7 @@ impl EventStream {
         match msg {
             Message::Text(b) => {
                 let value = serde_json::from_slice::<Value>(b.as_bytes())?;
-                match serde_json::from_slice::<Event>(b.as_bytes()) {
+                match serde_json::from_value::<Event>(value.clone()) {
                     Ok(ev) => Ok(Some(ev)),
                     Err(_) => Ok(Some(Event::Unknown(value))),
                 }
