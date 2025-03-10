@@ -131,6 +131,28 @@ impl ClientBuilder {
         Ok((client, stream))
     }
 
+    /// Builds a [`ComfyUIClient`] instance configured for HTTP-only
+    /// communication.
+    ///
+    /// This method initializes the client without establishing a websocket
+    /// connection, enabling you to interact with the ComfyUI service using
+    /// only HTTP (REST) requests.
+    ///
+    /// # Returns
+    ///
+    /// A [`ComfyUIClient`] instance on success, or an error.
+    pub async fn build_only_http(self) -> ClientResult<ComfyUIClient> {
+        let base_url = self.base_url;
+        let http_client = reqwest::Client::new();
+        let client_id = Uuid::new_v4().to_string();
+
+        Ok(ComfyUIClient {
+            base_url,
+            http_client,
+            client_id,
+        })
+    }
+
     /// Generates the websocket URL based on the base URL and client ID.
     ///
     /// This method changes the URL scheme to `wss` if the base URL uses HTTPS,
