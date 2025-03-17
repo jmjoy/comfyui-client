@@ -1,0 +1,3 @@
+[workspace]
+pr_name = "Release {{ package }} v{{ version }}"
+
