@@ -1,9 +1,6 @@
 name: Release-plz
 
-on:
-  push:
-    branches:
-      - master
+on: workflow_dispatch
 
 jobs:
   release-plz-release:
