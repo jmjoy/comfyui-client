@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/jmjoy/comfyui-client/compare/v0.1.2...v0.2.0) - 2025-03-19
+
+### Other
+
+- Reduce post_prompt api ([#8](https://github.com/jmjoy/comfyui-client/pull/8))
+- Update CI
+
 ## [0.1.2](https://github.com/jmjoy/comfyui-client/compare/v0.1.1...v0.1.2) - 2025-03-17
 
 ### Other
