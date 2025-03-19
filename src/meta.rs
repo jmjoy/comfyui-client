@@ -202,7 +202,7 @@ impl<'a> From<&'a str> for Prompt<'a> {
 
 impl<'a> From<&'a String> for Prompt<'a> {
     fn from(value: &'a String) -> Self {
-        Prompt::Str(&*value)
+        Prompt::Str(value)
     }
 }
 
