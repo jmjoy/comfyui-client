@@ -29,7 +29,7 @@ async fn test_integration() {
     let workflow_json = fs::read_to_string("./tests/data/blur-cat-workflow.json")
         .await
         .unwrap();
-    let prompt = client.post_prompt_str(&workflow_json).await.unwrap();
+    let prompt = client.post_prompt(&workflow_json).await.unwrap();
 
     let mut image_buf = Bytes::new();
 

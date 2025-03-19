@@ -13,12 +13,11 @@ use bytes::Bytes;
 use cfg_if::cfg_if;
 use errors::{ApiBody, ApiError};
 use futures_util::StreamExt;
-use meta::{Event, History, Prompt};
+use meta::{Event, History, Prompt, PromptStatus};
 use reqwest::{
     Body, IntoUrl, Response,
     multipart::{self},
 };
-use serde::Serialize;
 use serde_json::{Value, json};
 use std::{
     collections::HashMap,
@@ -260,40 +259,6 @@ impl ComfyUIClient {
         Ok(resp.bytes().await?)
     }
 
-    /// Sends a prompt in string format.
-    ///
-    /// Parses the input string as JSON and calls [`Self::post_prompt_value`] to
-    /// send the prompt.
-    ///
-    /// # Parameters
-    ///
-    /// - `prompt`: A string slice representing the prompt in JSON format.
-    ///
-    /// # Returns
-    ///
-    /// A [`Prompt`] object on success, or an error.
-    pub async fn post_prompt_str(&self, prompt: &str) -> ClientResult<Prompt> {
-        let prompt = serde_json::from_str::<Value>(prompt)?;
-        self.post_prompt_value(&prompt).await
-    }
-
-    /// Sends a prompt from any serializable data.
-    ///
-    /// Converts the provided data into JSON and calls
-    /// [`Self::post_prompt_value`] to send the prompt.
-    ///
-    /// # Parameters
-    ///
-    /// - `prompt`: A reference to any data that implements [`Serialize`].
-    ///
-    /// # Returns
-    ///
-    /// A [`Prompt`] object on success, or an error.
-    pub async fn post_prompt<T: Serialize>(&self, prompt: &T) -> ClientResult<Prompt> {
-        let prompt = serde_json::to_value(prompt)?;
-        self.post_prompt_value(&prompt).await
-    }
-
     /// Sends a prompt in JSON format.
     ///
     /// Constructs the request payload (including the client ID and prompt data)
@@ -301,12 +266,16 @@ impl ComfyUIClient {
     ///
     /// # Parameters
     ///
-    /// - `prompt`: A JSON value representing the prompt data.
+    /// - `prompt`: representing the prompt data.
     ///
     /// # Returns
     ///
-    /// A [`Prompt`] object on success, or an error.
-    pub async fn post_prompt_value(&self, prompt: &Value) -> ClientResult<Prompt> {
+    /// A [`PromptStatus`] object on success, or an error.
+    pub async fn post_prompt(&self, prompt: impl Into<Prompt<'_>>) -> ClientResult<PromptStatus> {
+        let prompt = match prompt.into() {
+            Prompt::Str(prompt) => &serde_json::from_str::<Value>(prompt)?,
+            Prompt::Value(prompt) => prompt,
+        };
         let data = json!({"client_id": &self.client_id, "prompt": prompt});
         let resp = self
             .http_client

@@ -30,7 +30,7 @@ pub struct FileInfo {
 
 /// Represents a prompt with an identifier, a number, and potential node errors.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Prompt {
+pub struct PromptStatus {
     /// Unique identifier for the prompt.
     pub prompt_id: String,
     /// A numeric identifier for the prompt.
@@ -183,6 +183,33 @@ pub struct ExecutionInterruptedEvent {
     pub node_type: String,
     /// A list of node identifiers that were executed before the interruption.
     pub executed: Vec<String>,
+}
+
+/// `Prompt` param for
+/// [`ComfyUIClient::post_prompt`](crate::ComfyUIClient::post_prompt).
+pub enum Prompt<'a> {
+    /// A string slice representing the prompt in JSON format.
+    Str(&'a str),
+    /// A JSON value representing the prompt data.
+    Value(&'a Value),
+}
+
+impl<'a> From<&'a str> for Prompt<'a> {
+    fn from(value: &'a str) -> Self {
+        Prompt::Str(value)
+    }
+}
+
+impl<'a> From<&'a String> for Prompt<'a> {
+    fn from(value: &'a String) -> Self {
+        Prompt::Str(value)
+    }
+}
+
+impl<'a> From<&'a Value> for Prompt<'a> {
+    fn from(value: &'a Value) -> Self {
+        Prompt::Value(value)
+    }
 }
 
 #[cfg(test)]
