@@ -1,4 +1,3 @@
-use crate::ClientResult;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::HashMap, fmt::Debug};
@@ -186,6 +185,33 @@ pub struct ExecutionInterruptedEvent {
     pub executed: Vec<String>,
 }
 
+/// `Prompt` param for
+/// [`ComfyUIClient::post_prompt`](crate::ComfyUIClient::post_prompt).
+pub enum Prompt<'a> {
+    /// A string slice representing the prompt in JSON format.
+    Str(&'a str),
+    /// A JSON value representing the prompt data.
+    Value(&'a Value),
+}
+
+impl<'a> From<&'a str> for Prompt<'a> {
+    fn from(value: &'a str) -> Self {
+        Prompt::Str(value)
+    }
+}
+
+impl<'a> From<&'a String> for Prompt<'a> {
+    fn from(value: &'a String) -> Self {
+        Prompt::Str(&*value)
+    }
+}
+
+impl<'a> From<&'a Value> for Prompt<'a> {
+    fn from(value: &'a Value) -> Self {
+        Prompt::Value(value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,46 +249,5 @@ mod tests {
                 }
             })
         );
-    }
-}
-
-/// The `Prompt` struct represents a client prompt.
-///
-/// It wraps an inner `Value` that holds the actual prompt data.
-/// The inner field is only visible within the current crate, ensuring
-/// encapsulation and data safety.
-pub struct Prompt(pub(crate) Value);
-
-/// The `TryIntoPrompt` trait defines an interface for converting other types
-/// into a `Prompt`.
-///
-/// Types implementing this trait can attempt to convert themselves into a
-/// `Prompt` using the `try_into_prompt` method.
-pub trait TryIntoPrompt {
-    /// Attempts to convert the current instance into a `Prompt`.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `ClientResult<Prompt>` which:
-    /// - Contains the converted `Prompt` instance on success,
-    /// - Or an appropriate error on failure.
-    fn try_into_prompt(self) -> ClientResult<Prompt>;
-}
-
-impl TryIntoPrompt for &str {
-    fn try_into_prompt(self) -> ClientResult<Prompt> {
-        Ok(Prompt(serde_json::from_str::<Value>(self)?))
-    }
-}
-
-impl<T: Serialize> TryIntoPrompt for &T {
-    fn try_into_prompt(self) -> ClientResult<Prompt> {
-        Ok(Prompt(serde_json::to_value(self)?))
-    }
-}
-
-impl TryIntoPrompt for Value {
-    fn try_into_prompt(self) -> ClientResult<Prompt> {
-        Ok(Prompt(self))
     }
 }

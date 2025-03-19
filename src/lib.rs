@@ -13,7 +13,7 @@ use bytes::Bytes;
 use cfg_if::cfg_if;
 use errors::{ApiBody, ApiError};
 use futures_util::StreamExt;
-use meta::{Event, History, PromptStatus, TryIntoPrompt};
+use meta::{Event, History, Prompt, PromptStatus};
 use reqwest::{
     Body, IntoUrl, Response,
     multipart::{self},
@@ -271,8 +271,11 @@ impl ComfyUIClient {
     /// # Returns
     ///
     /// A [`PromptStatus`] object on success, or an error.
-    pub async fn post_prompt(&self, prompt: impl TryIntoPrompt) -> ClientResult<PromptStatus> {
-        let prompt = prompt.try_into_prompt()?.0;
+    pub async fn post_prompt(&self, prompt: impl Into<Prompt<'_>>) -> ClientResult<PromptStatus> {
+        let prompt = match prompt.into() {
+            Prompt::Str(prompt) => &serde_json::from_str::<Value>(prompt)?,
+            Prompt::Value(prompt) => prompt,
+        };
         let data = json!({"client_id": &self.client_id, "prompt": prompt});
         let resp = self
             .http_client
