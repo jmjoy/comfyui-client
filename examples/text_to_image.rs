@@ -140,7 +140,7 @@ async fn main() {
 
     debug!("start to queue prompt");
 
-    let prompt = client.post_prompt_str(WORKFLOW_JSON).await.unwrap();
+    let prompt = client.post_prompt(WORKFLOW_JSON).await.unwrap();
 
     info!(prompt_id:% = prompt.prompt_id; "queued prompt");
 

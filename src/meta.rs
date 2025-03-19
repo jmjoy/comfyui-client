@@ -1,3 +1,4 @@
+use crate::ClientResult;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::HashMap, fmt::Debug};
@@ -30,7 +31,7 @@ pub struct FileInfo {
 
 /// Represents a prompt with an identifier, a number, and potential node errors.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Prompt {
+pub struct PromptStatus {
     /// Unique identifier for the prompt.
     pub prompt_id: String,
     /// A numeric identifier for the prompt.
@@ -222,5 +223,46 @@ mod tests {
                 }
             })
         );
+    }
+}
+
+/// The `Prompt` struct represents a client prompt.
+///
+/// It wraps an inner `Value` that holds the actual prompt data.
+/// The inner field is only visible within the current crate, ensuring
+/// encapsulation and data safety.
+pub struct Prompt(pub(crate) Value);
+
+/// The `TryIntoPrompt` trait defines an interface for converting other types
+/// into a `Prompt`.
+///
+/// Types implementing this trait can attempt to convert themselves into a
+/// `Prompt` using the `try_into_prompt` method.
+pub trait TryIntoPrompt {
+    /// Attempts to convert the current instance into a `Prompt`.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `ClientResult<Prompt>` which:
+    /// - Contains the converted `Prompt` instance on success,
+    /// - Or an appropriate error on failure.
+    fn try_into_prompt(self) -> ClientResult<Prompt>;
+}
+
+impl TryIntoPrompt for &str {
+    fn try_into_prompt(self) -> ClientResult<Prompt> {
+        Ok(Prompt(serde_json::from_str::<Value>(self)?))
+    }
+}
+
+impl<T: Serialize> TryIntoPrompt for &T {
+    fn try_into_prompt(self) -> ClientResult<Prompt> {
+        Ok(Prompt(serde_json::to_value(self)?))
+    }
+}
+
+impl TryIntoPrompt for Value {
+    fn try_into_prompt(self) -> ClientResult<Prompt> {
+        Ok(Prompt(self))
     }
 }
