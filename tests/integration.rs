@@ -36,8 +36,8 @@ async fn test_integration() {
     'stream: while let Some(ev) = stream.next().await {
         let ev = ev.unwrap();
 
-        if let Event::Executed(executed_event) = ev {
-            let images = executed_event.output.images;
+        if let Event::Executed { data } = ev {
+            let images = data.output.images;
             assert_eq!(images.len(), 1);
 
             image_buf = client.get_view(&images[0]).await.unwrap();

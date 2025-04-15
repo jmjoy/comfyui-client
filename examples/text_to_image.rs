@@ -1,6 +1,7 @@
 use comfyui_client::{ClientBuilder, meta::Event};
 use futures_util::StreamExt;
 use log::{debug, error, info, warn};
+use serde_json::json;
 use std::env::temp_dir;
 use tokio::fs;
 
@@ -147,44 +148,52 @@ async fn main() {
     while let Some(ev) = stream.next().await {
         let ev = ev.unwrap();
         match ev {
-            Event::Status(status_event) => {
-                info!(status_event:?; "receive status event");
+            Event::Status { data, sid } => {
+                debug!(data:?, sid:?; "receive status event");
             }
-            Event::ExecutionStart(execution_start_event) => {
-                info!(execution_start_event:?; "receive execution status event");
+            Event::ExecutionStart { data } => {
+                debug!(data:?; "receive execution status event");
             }
-            Event::ExecutionCached(execution_cached_event) => {
-                info!(execution_cached_event:?; "receive execution cached event");
+            Event::ExecutionCached { data } => {
+                debug!(data:?; "receive execution cached event");
             }
-            Event::Progress(progress_event) => {
-                info!(progress_event:?; "receive process event");
+            Event::Progress { data } => {
+                debug!(data:?; "receive process event");
             }
-            Event::Executing(executing_event) => {
-                info!(executing_event:?; "receive executing event");
+            Event::Executing { data } => {
+                debug!(data:?; "receive executing event");
             }
-            Event::Executed(executed_event) => {
-                info!(executed_event:?; "receive executed event");
+            Event::Executed { data } => {
+                debug!(data:?; "receive executed event");
 
-                for image in executed_event.output.images {
+                for image in data.output.images {
                     let buf = client.get_view(&image).await.unwrap();
                     let file_path = temp_dir().join(image.filename);
                     fs::write(&file_path, &buf).await.unwrap();
                     info!(file_path:% = file_path.display(); "write to file success");
                 }
             }
-            Event::ExecutionError(execution_error_event) => {
-                error!(execution_error_event:?; "receive execution error event");
+            Event::ExecutionSuccess { data } => {
+                debug!(data:?; "receive execution success event");
+                break;
             }
-            Event::ExecutionInterrupted(execution_interrupted_event) => {
-                error!(execution_interrupted_event:?; "receive execution_interrupted_event");
+            Event::ExecutionError { data } => {
+                error!(data:?; "receive execution error event");
             }
-            Event::Unknown(value) => {
-                warn!(event:? = value; "receive unknown event");
+            Event::ExecutionInterrupted { data } => {
+                error!(data:?; "receive execution_interrupted_event");
             }
-            Event::Other(ev) => {
-                warn!(ev:?; "receive other event");
+            Event::Unknown(event) => {
+                if event["type"] != json!("crystools.monitor") {
+                    warn!(event:?; "receive unknown event");
+                }
             }
-            _ => {}
+            Event::Other(event) => {
+                warn!(event:?; "receive other event");
+            }
+            _ => {
+                warn!("receive unhandled event type");
+            }
         }
     }
 }

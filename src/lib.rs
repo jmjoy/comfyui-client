@@ -13,6 +13,7 @@ use bytes::Bytes;
 use cfg_if::cfg_if;
 use errors::{ApiBody, ApiError};
 use futures_util::StreamExt;
+use log::trace;
 use meta::{Event, History, OtherEvent, Prompt, PromptStatus};
 use reqwest::{
     Body, IntoUrl, Response,
@@ -485,6 +486,7 @@ impl EventStream {
         let msg = msg?;
         match msg {
             Message::Text(b) => {
+                trace!(message:% = b.as_str(); "received websocket message");
                 let value = serde_json::from_slice::<Value>(b.as_bytes())?;
                 match serde_json::from_value::<Event>(value.clone()) {
                     Ok(ev) => Ok(Some(ev)),
