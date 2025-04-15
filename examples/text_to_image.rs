@@ -151,19 +151,19 @@ async fn main() {
             Event::Status { data, sid } => {
                 debug!(data:?, sid:?; "receive status event");
             }
-            Event::ExecutionStart { data, .. } => {
+            Event::ExecutionStart { data } => {
                 debug!(data:?; "receive execution status event");
             }
-            Event::ExecutionCached { data, .. } => {
+            Event::ExecutionCached { data } => {
                 debug!(data:?; "receive execution cached event");
             }
-            Event::Progress { data, .. } => {
+            Event::Progress { data } => {
                 debug!(data:?; "receive process event");
             }
-            Event::Executing { data, .. } => {
+            Event::Executing { data } => {
                 debug!(data:?; "receive executing event");
             }
-            Event::Executed { data, .. } => {
+            Event::Executed { data } => {
                 debug!(data:?; "receive executed event");
 
                 for image in data.output.images {
@@ -173,14 +173,14 @@ async fn main() {
                     info!(file_path:% = file_path.display(); "write to file success");
                 }
             }
-            Event::ExecutionSuccess { data, .. } => {
+            Event::ExecutionSuccess { data } => {
                 debug!(data:?; "receive execution success event");
                 break;
             }
-            Event::ExecutionError { data, .. } => {
+            Event::ExecutionError { data } => {
                 error!(data:?; "receive execution error event");
             }
-            Event::ExecutionInterrupted { data, .. } => {
+            Event::ExecutionInterrupted { data } => {
                 error!(execution_interrupted_event:? = data; "receive execution_interrupted_event");
             }
             Event::Unknown(event) => {
@@ -194,10 +194,6 @@ async fn main() {
             _ => {
                 warn!("receive unhandled event type");
             }
-            Event::Other(ev) => {
-                warn!(ev:?; "receive other event");
-            }
-            _ => {}
         }
     }
 }
