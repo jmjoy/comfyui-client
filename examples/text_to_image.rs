@@ -181,6 +181,10 @@ async fn main() {
             Event::Unknown(value) => {
                 warn!(event:? = value; "receive unknown event");
             }
+            Event::Other(ev) => {
+                warn!(ev:?; "receive other event");
+            }
+            _ => {}
         }
     }
 }
