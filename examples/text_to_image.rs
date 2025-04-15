@@ -130,7 +130,7 @@ const WORKFLOW_JSON: &str = r#"
 #[tokio::main]
 async fn main() {
     env_logger::builder()
-        .filter_module("text_to_image", log::LevelFilter::Debug)
+        .filter_level(log::LevelFilter::Debug)
         .init();
 
     let (client, mut stream) = ClientBuilder::new("http://localhost:8188")
