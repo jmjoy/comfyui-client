@@ -227,33 +227,6 @@ impl<'a> From<&'a Value> for Prompt<'a> {
     }
 }
 
-/// `Prompt` param for
-/// [`ComfyUIClient::post_prompt`](crate::ComfyUIClient::post_prompt).
-pub enum Prompt<'a> {
-    /// A string slice representing the prompt in JSON format.
-    Str(&'a str),
-    /// A JSON value representing the prompt data.
-    Value(&'a Value),
-}
-
-impl<'a> From<&'a str> for Prompt<'a> {
-    fn from(value: &'a str) -> Self {
-        Prompt::Str(value)
-    }
-}
-
-impl<'a> From<&'a String> for Prompt<'a> {
-    fn from(value: &'a String) -> Self {
-        Prompt::Str(value)
-    }
-}
-
-impl<'a> From<&'a Value> for Prompt<'a> {
-    fn from(value: &'a Value) -> Self {
-        Prompt::Value(value)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
