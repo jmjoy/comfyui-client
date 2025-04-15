@@ -10,7 +10,6 @@ pub mod meta;
 pub use crate::errors::{ClientError, ClientResult};
 use crate::meta::{FileInfo, PromptInfo};
 use bytes::Bytes;
-use cfg_if::cfg_if;
 use errors::{ApiBody, ApiError};
 use futures_util::StreamExt;
 use log::trace;
