@@ -181,7 +181,7 @@ async fn main() {
                 error!(data:?; "receive execution error event");
             }
             Event::ExecutionInterrupted { data } => {
-                error!(execution_interrupted_event:? = data; "receive execution_interrupted_event");
+                error!(data:?; "receive execution_interrupted_event");
             }
             Event::Unknown(event) => {
                 if event["type"] != json!("crystools.monitor") {
