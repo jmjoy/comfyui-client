@@ -130,7 +130,6 @@ const WORKFLOW_JSON: &str = r#"
 #[tokio::main]
 async fn main() {
     env_logger::builder()
-        .filter_module("comfyui_client", log::LevelFilter::Trace)
         .filter_module("text_to_image", log::LevelFilter::Debug)
         .init();
 
