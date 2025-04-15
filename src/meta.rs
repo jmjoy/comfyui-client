@@ -60,6 +60,7 @@ pub struct Images {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type", content = "data")]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum Event {
     /// A status event containing execution information.
     Status(StatusEvent),
@@ -79,9 +80,23 @@ pub enum Event {
     ExecutionCached(ExecutionCachedEvent),
     /// An event indicating that the execution was interrupted.
     ExecutionInterrupted(ExecutionInterruptedEvent),
+    /// Events that are not part of the ComfyUI API but are added by the client.
+    #[serde(skip)]
+    Other(OtherEvent),
     /// An unknown event type that encapsulates raw JSON data.
     #[serde(skip)]
     Unknown(Value),
+}
+
+/// Represents events that are not part of the standard ComfyUI API
+/// but are added by the client for additional functionality.
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type", content = "data")]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum OtherEvent {
+    /// Event indicating a successful reconnection to the WebSocket.
+    ReconnectSuccess,
 }
 
 /// Event payload for a status event, containing execution information.

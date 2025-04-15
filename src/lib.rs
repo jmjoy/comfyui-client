@@ -13,7 +13,7 @@ use bytes::Bytes;
 use cfg_if::cfg_if;
 use errors::{ApiBody, ApiError};
 use futures_util::StreamExt;
-use meta::{Event, History, Prompt, PromptStatus};
+use meta::{Event, History, OtherEvent, Prompt, PromptStatus};
 use reqwest::{
     Body, IntoUrl, Response,
     multipart::{self},
@@ -23,10 +23,10 @@ use std::{
     collections::HashMap,
     ops::{Deref, DerefMut},
 };
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{net::TcpStream, sync::mpsc, task::JoinHandle};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_tungstenite::{
-    connect_async,
+    MaybeTlsStream, WebSocketStream, connect_async,
     tungstenite::{self, Message},
 };
 use url::Url;
@@ -39,6 +39,7 @@ use uuid::Uuid;
 pub struct ClientBuilder {
     base_url: Url,
     channel_bound: usize,
+    reconnect: bool,
 }
 
 impl ClientBuilder {
@@ -56,7 +57,58 @@ impl ClientBuilder {
         Ok(Self {
             base_url: base_url.into_url()?,
             channel_bound: 100,
+            reconnect: true,
         })
+    }
+
+    /// Sets whether the websocket should attempt to reconnect automatically
+    /// when disconnected.
+    ///
+    /// By default, reconnection is enabled (`true`).
+    ///
+    /// # Parameters
+    ///
+    /// - `reconnect`: Whether to attempt reconnection when the WebSocket
+    ///   connection drops unexpectedly.
+    ///
+    /// # Returns
+    ///
+    /// The updated [`ClientBuilder`] instance.
+    pub fn reconnect(mut self, reconnect: bool) -> Self {
+        self.reconnect = reconnect;
+        self
+    }
+
+    /// Helper method to establish a WebSocket connection
+    async fn connect_to_websocket(
+        ws_url: &Url,
+    ) -> ClientResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
+        let (stream, _) = if ws_url.scheme() == "wss" {
+            cfg_if! {
+                if #[cfg(feature = "rustls")] {
+                    let root_store = rustls::RootCertStore {
+                        roots: webpki_roots::TLS_SERVER_ROOTS.into(),
+                    };
+                    let config = rustls::ClientConfig::builder()
+                        .with_root_certificates(root_store)
+                        .with_no_client_auth();
+
+                    tokio_tungstenite::connect_async_tls_with_config(
+                        ws_url.clone(),
+                        None,
+                        false,
+                        Some(tokio_tungstenite::Connector::Rustls(std::sync::Arc::new(config))),
+                    )
+                    .await?
+                } else {
+                    connect_async(ws_url.clone()).await?
+                }
+            }
+        } else {
+            connect_async(ws_url.clone()).await?
+        };
+
+        Ok(stream)
     }
 
     /// Builds the [`ComfyUIClient`] along with an associated [`EventStream`].
@@ -72,43 +124,92 @@ impl ClientBuilder {
         let base_url = self.base_url;
         let http_client = reqwest::Client::new();
         let client_id = Uuid::new_v4().to_string();
+        let reconnect = self.reconnect;
 
         let (ev_tx, ev_rx) = mpsc::channel(self.channel_bound);
 
         let ws_url = Self::generate_websocket_url(base_url.clone(), &client_id)?;
-        let (stream, _) = if ws_url.scheme() == "wss" {
-            cfg_if! {
-                if #[cfg(feature = "rustls")] {
-                    let root_store = rustls::RootCertStore {
-                        roots: webpki_roots::TLS_SERVER_ROOTS.into(),
-                    };
-                    let config = rustls::ClientConfig::builder()
-                        .with_root_certificates(root_store)
-                        .with_no_client_auth();
 
-                    tokio_tungstenite::connect_async_tls_with_config(
-                        ws_url,
-                        None,
-                        false,
-                        Some(tokio_tungstenite::Connector::Rustls(std::sync::Arc::new(config))),
-                    )
-                    .await?
-                } else {
-                    connect_async(ws_url).await?
-                }
-            }
-        } else {
-            connect_async(ws_url).await?
-        };
+        // Initial connection
+        let ws_stream = Self::connect_to_websocket(&ws_url).await?;
 
+        // Spawn the stream handling task with reconnection support
         let stream_handle = tokio::spawn(async move {
-            let (_, mut read_stream) = stream.split();
-            while let Some(msg) = read_stream.next().await {
-                let ev = EventStream::handle_message(msg);
-                let Some(ev) = ev.transpose() else {
-                    continue;
-                };
-                if ev_tx.send(ev).await.is_err() {
+            let (_, mut read_stream) = ws_stream.split();
+
+            loop {
+                let mut connection_alive = true;
+
+                // Process messages until the connection drops
+                while let Some(msg) = read_stream.next().await {
+                    match msg {
+                        Ok(message) => {
+                            let ev = EventStream::handle_message(Ok(message));
+                            let Some(ev) = ev.transpose() else {
+                                continue;
+                            };
+                            if ev_tx.send(ev).await.is_err() {
+                                connection_alive = false;
+                                break;
+                            }
+                        }
+                        Err(err) => {
+                            // Connection error occurred
+                            connection_alive = false;
+                            // Send error to the stream
+                            let _ = ev_tx.send(Err(ClientError::from(err))).await;
+                            break;
+                        }
+                    }
+                }
+
+                // If reconnect is disabled or the channel is closed, exit the loop
+                if !reconnect || ev_tx.is_closed() {
+                    break;
+                }
+
+                // Attempt to reconnect with a small delay until successful or channel closed
+                if !connection_alive {
+                    // Keep trying to reconnect until successful
+                    loop {
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+                        // Check if channel is closed before attempting reconnection
+                        if ev_tx.is_closed() {
+                            break;
+                        }
+
+                        // Try to establish a new connection
+                        match Self::connect_to_websocket(&ws_url).await {
+                            Ok(new_stream) => {
+                                // Successfully reconnected
+                                (_, read_stream) = new_stream.split();
+                                // Send reconnection success event
+                                let _ = ev_tx
+                                    .send(Ok(Event::Other(OtherEvent::ReconnectSuccess)))
+                                    .await;
+                                // Break out of the reconnection loop and continue with the new
+                                // connection
+                                break;
+                            }
+                            Err(err) => {
+                                // Failed to reconnect, send error and continue trying
+                                let _ = ev_tx.send(Err(err)).await;
+                                // If channel closed during error sending, exit
+                                if ev_tx.is_closed() {
+                                    break;
+                                }
+                                // Otherwise continue the reconnection loop
+                            }
+                        }
+                    }
+
+                    // If the channel was closed during reconnection attempts, exit the main loop
+                    if ev_tx.is_closed() {
+                        break;
+                    }
+                } else {
+                    // Exit when connection is closed normally without errors
                     break;
                 }
             }
