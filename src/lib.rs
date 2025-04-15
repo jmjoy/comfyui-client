@@ -86,30 +86,24 @@ impl ClientBuilder {
     async fn connect_to_websocket(
         ws_url: &Url,
     ) -> ClientResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
-        let (stream, _) = if ws_url.scheme() == "wss" {
-            cfg_if! {
-                if #[cfg(feature = "rustls")] {
-                    let root_store = rustls::RootCertStore {
-                        roots: webpki_roots::TLS_SERVER_ROOTS.into(),
-                    };
-                    let config = rustls::ClientConfig::builder()
-                        .with_root_certificates(root_store)
-                        .with_no_client_auth();
-
-                    tokio_tungstenite::connect_async_tls_with_config(
-                        ws_url.clone(),
-                        None,
-                        false,
-                        Some(tokio_tungstenite::Connector::Rustls(std::sync::Arc::new(config))),
-                    )
-                    .await?
-                } else {
-                    connect_async(ws_url.clone()).await?
-                }
-            }
-        } else {
-            connect_async(ws_url.clone()).await?
-        };
+        let (stream, _) = connect_async(ws_url.clone()).await?;
+        // let (stream, _) = if ws_url.scheme() == "wss" {
+        //     cfg_if! {
+        //         if #[cfg(feature = "rustls")] {
+        //             tokio_tungstenite::connect_async_tls_with_config(
+        //                 ws_url.clone(),
+        //                 None,
+        //                 false,
+        //                 None,
+        //             )
+        //             .await?
+        //         } else {
+        //             connect_async(ws_url.clone()).await?
+        //         }
+        //     }
+        // } else {
+        //     connect_async(ws_url.clone()).await?
+        // };
 
         Ok(stream)
     }
