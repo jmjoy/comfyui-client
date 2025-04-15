@@ -174,7 +174,6 @@ name = "comfyui-client"
 version = "0.1.2"
 dependencies = [
  "bytes",
- "cfg-if",
  "env_logger",
  "futures-util",
  "log",
@@ -1545,9 +1544,11 @@ checksum = "7a9daff607c6d2bf6c16fd681ccb7eecc83e4e2cdc1ca067ffaadfca5de7f084"
 dependencies = [
  "futures-util",
  "log",
+ "native-tls",
  "rustls",
  "rustls-pki-types",
  "tokio",
+ "tokio-native-tls",
  "tokio-rustls",
  "tungstenite",
  "webpki-roots",
@@ -1629,6 +1630,7 @@ dependencies = [
  "http",
  "httparse",
  "log",
+ "native-tls",
  "rand 0.9.0",
  "rustls",
  "rustls-pki-types",
