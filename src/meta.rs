@@ -58,34 +58,35 @@ pub struct Images {
 /// The enum variants correspond to different event types. The `Unknown` variant
 /// holds raw JSON data for unrecognized events.
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(tag = "type", content = "data")]
+#[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Event {
     /// A status event containing execution information.
-    Status(StatusEvent),
+    Status { data: StatusEventData, sid: Option<String> },
     /// A progress event indicating current progress.
-    Progress(ProgressEvent),
+    Progress { data: ProgressEventData },
     /// An event indicating that a node has completed execution along with its
     /// output.
-    Executed(ExecutedEvent),
+    Executed { data: ExecutedEventData },
     /// An event indicating that a node is currently executing.
-    Executing(ExecutingEvent),
+    Executing { data: ExecutingEventData },
     /// An event signaling the start of execution for a prompt.
-    ExecutionStart(ExecutionStartEvent),
+    ExecutionStart { data: ExecutionStartEventData },
     /// An event signaling that an error occurred during execution.
-    ExecutionError(ExecutionErrorEvent),
+    ExecutionError { data: ExecutionErrorEventData },
     /// An event indicating that the execution results were retrieved from the
     /// cache.
-    ExecutionCached(ExecutionCachedEvent),
+    ExecutionCached { data: ExecutionCachedEventData },
     /// An event indicating that the execution was interrupted.
-    ExecutionInterrupted(ExecutionInterruptedEvent),
-    /// Events that are not part of the ComfyUI API but are added by the client.
-    #[serde(skip)]
-    Other(OtherEvent),
+    ExecutionInterrupted { data: ExecutionInterruptedEventData },
+    ExecutionSuccess { data: ExecutionSuccessEventData },
     /// An unknown event type that encapsulates raw JSON data.
     #[serde(skip)]
     Unknown(Value),
+    /// Events that are not part of the ComfyUI API but are added by the client.
+    #[serde(skip)]
+    Other(OtherEvent),
 }
 
 /// Represents events that are not part of the standard ComfyUI API
@@ -101,15 +102,21 @@ pub enum OtherEvent {
 
 /// Event payload for a status event, containing execution information.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct StatusEvent {
+pub struct StatusEventData {
     /// Execution information associated with the event.
-    pub status: ExecInfo,
+    pub status: StatusEventDataStatus,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StatusEventDataStatus {
+    /// Execution information associated with the event.
+    pub exec_info: ExecInfo,
 }
 
 /// Event payload for a progress update, including current value and maximum
 /// value.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ProgressEvent {
+pub struct ProgressEventData {
     /// The current progress value.
     pub value: usize,
     /// The maximum progress value.
@@ -126,7 +133,7 @@ pub struct Output {
 /// Event payload for a completed execution, including the node identifier,
 /// prompt ID, and output data.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ExecutedEvent {
+pub struct ExecutedEventData {
     /// Identifier of the node that completed execution.
     pub node: String,
     /// The prompt ID associated with the execution.
@@ -138,24 +145,26 @@ pub struct ExecutedEvent {
 /// Event payload for an execution in progress, including the node identifier
 /// and prompt ID.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ExecutingEvent {
+pub struct ExecutingEventData {
     /// Identifier of the node currently executing.
-    pub node: String,
+    pub node: Option<String>,
+    pub display_node: Option<String>,
     /// The prompt ID associated with the execution.
     pub prompt_id: String,
 }
 
 /// Event payload indicating that the execution has started.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ExecutionStartEvent {
+pub struct ExecutionStartEventData {
     /// The prompt ID for which the execution has started.
     pub prompt_id: String,
+    pub timestamp: u64,
 }
 
 /// Event payload for an execution error, containing details about the error and
 /// its context.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ExecutionErrorEvent {
+pub struct ExecutionErrorEventData {
     /// The prompt ID associated with the error.
     pub prompt_id: String,
     /// The identifier of the node where the error occurred.
@@ -179,17 +188,18 @@ pub struct ExecutionErrorEvent {
 /// Event payload indicating that the execution result was obtained from the
 /// cache.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ExecutionCachedEvent {
+pub struct ExecutionCachedEventData {
     /// A list of node identifiers that were cached.
     pub nodes: Vec<String>,
     /// The prompt ID associated with the cached execution.
     pub prompt_id: String,
+    pub timestamp: u64,
 }
 
 /// Event payload for an interrupted execution, containing details about the
 /// interruption.
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ExecutionInterruptedEvent {
+pub struct ExecutionInterruptedEventData {
     /// The prompt ID associated with the interruption.
     pub prompt_id: String,
     /// The identifier of the node where the execution was interrupted.
@@ -198,6 +208,11 @@ pub struct ExecutionInterruptedEvent {
     pub node_type: String,
     /// A list of node identifiers that were executed before the interruption.
     pub executed: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ExecutionSuccessEventData {
+    pub prompt_id: String,
 }
 
 /// `Prompt` param for
@@ -235,9 +250,11 @@ mod tests {
     /// Tests serialization of different event types.
     #[test]
     fn test_serialize_event() {
-        let ev = Event::Status(StatusEvent {
-            status: ExecInfo { queue_remaining: 0 },
-        });
+        let ev = Event::Status {
+            data: StatusEventData {
+                status: ExecInfo { queue_remaining: 0 },
+            },
+        };
         let value = serde_json::to_value(&ev).unwrap();
         assert_eq!(
             value,
@@ -251,9 +268,11 @@ mod tests {
             })
         );
 
-        let ev = Event::ExecutionStart(ExecutionStartEvent {
-            prompt_id: "xxxxxx".to_string(),
-        });
+        let ev = Event::ExecutionStart {
+            data: ExecutionStartEventData {
+                prompt_id: "xxxxxx".to_string(),
+            },
+        };
         let value = serde_json::to_value(&ev).unwrap();
         assert_eq!(
             value,

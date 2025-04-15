@@ -31,6 +31,7 @@ use tokio_tungstenite::{
 };
 use url::Url;
 use uuid::Uuid;
+use log::trace;
 
 /// A builder for creating a [`ComfyUIClient`] instance.
 ///
@@ -485,6 +486,7 @@ impl EventStream {
         let msg = msg?;
         match msg {
             Message::Text(b) => {
+                trace!(message:% = b.as_str(); "received websocket message");
                 let value = serde_json::from_slice::<Value>(b.as_bytes())?;
                 match serde_json::from_value::<Event>(value.clone()) {
                     Ok(ev) => Ok(Some(ev)),
