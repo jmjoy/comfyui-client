@@ -1,7 +1,7 @@
 use comfyui_client::{ClientBuilder, meta::Event};
 use futures_util::StreamExt;
 use log::{debug, error, info, warn};
-use serde_json::{Value, json};
+use serde_json::json;
 use std::env::temp_dir;
 use tokio::fs;
 
