@@ -53,58 +53,84 @@ pub struct Images {
     pub images: Option<Vec<FileInfo>>,
 }
 
-/// Represents events emitted by the system.
+/// Represents events emitted by the ComfyUI service during workflow execution.
 ///
-/// The enum variants correspond to different event types. The `Unknown` variant
-/// holds raw JSON data for unrecognized events.
+/// This enum encapsulates various event types that occur during the lifecycle
+/// of a workflow, from queuing to completion. Each variant contains specific
+/// data relevant to that event type. The `Unknown` variant captures any
+/// unrecognized events from the API, while the `Other` variant
+/// holds client-specific events not part of the standard ComfyUI API.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Event {
-    /// A status event containing execution information.
-    Status { data: StatusEventData, sid: Option<String> },
-    /// A progress event indicating current progress.
-    Progress { data: ProgressEventData },
+    /// A status event containing queue and execution information.
+    Status {
+        /// Data payload for the status event, including execution information.
+        data: StatusEventData,
+        /// Optional session identifier associated with this event.
+        sid: Option<String>,
+    },
+    /// A progress event indicating current progress of an operation.
+    Progress {
+        /// Data payload containing current and maximum progress values.
+        data: ProgressEventData,
+    },
     /// An event indicating that a node has completed execution along with its
-    /// output.
-    Executed { data: ExecutedEventData },
+    /// output data.
+    Executed {
+        /// Data payload containing node output information and associated
+        /// images.
+        data: ExecutedEventData,
+    },
     /// An event indicating that a node is currently executing.
-    Executing { data: ExecutingEventData },
+    Executing {
+        /// Data payload identifying the currently executing node.
+        data: ExecutingEventData,
+    },
     /// An event signaling the start of execution for a prompt.
-    ExecutionStart { data: ExecutionStartEventData },
+    ExecutionStart {
+        /// Data payload containing prompt ID and timestamp information.
+        data: ExecutionStartEventData,
+    },
     /// An event signaling that an error occurred during execution.
-    ExecutionError { data: ExecutionErrorEventData },
+    ExecutionError {
+        /// Data payload containing detailed error information and context.
+        data: ExecutionErrorEventData,
+    },
     /// An event indicating that the execution results were retrieved from the
     /// cache.
-    ExecutionCached { data: ExecutionCachedEventData },
+    ExecutionCached {
+        /// Data payload containing information about which nodes were retrieved
+        /// from cache.
+        data: ExecutionCachedEventData,
+    },
     /// An event indicating that the execution was interrupted.
-    ExecutionInterrupted { data: ExecutionInterruptedEventData },
-    ExecutionSuccess { data: ExecutionSuccessEventData },
-    /// An unknown event type that encapsulates raw JSON data.
+    ExecutionInterrupted {
+        /// Data payload containing details about where and why the execution
+        /// was interrupted.
+        data: ExecutionInterruptedEventData,
+    },
+    /// An event indicating that the entire workflow has executed successfully.
+    ExecutionSuccess {
+        /// Data payload containing the prompt ID of the successfully executed
+        /// workflow.
+        data: ExecutionSuccessEventData,
+    },
+    /// An unknown event type that encapsulates raw JSON data for events not
+    /// explicitly defined.
     #[serde(skip)]
     Unknown(Value),
-    /// Events that are not part of the ComfyUI API but are added by the client.
+    /// Events that are not part of the ComfyUI API but are added by the client
+    /// for internal functionality.
     #[serde(skip)]
     Other(OtherEvent),
 }
 
 /// Represents events that are not part of the standard ComfyUI API
 /// but are added by the client for additional functionality.
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(tag = "type", content = "data")]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum OtherEvent {
-    /// Event indicating a successful reconnection to the WebSocket.
-    ReconnectSuccess,
-}
-
-/// Represents events that are not part of the standard ComfyUI API
-/// but are added by the client for additional functionality.
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(tag = "type", content = "data")]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum OtherEvent {
     /// Event indicating a successful reconnection to the WebSocket.
@@ -112,117 +138,186 @@ pub enum OtherEvent {
 }
 
 /// Event payload for a status event, containing execution information.
+///
+/// This structure is received when ComfyUI sends a status update, typically
+/// containing information about the current execution queue state.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StatusEventData {
-    /// Execution information associated with the event.
+    /// Execution information associated with the event, including queue
+    /// details.
     pub status: StatusEventDataStatus,
 }
 
+/// Container for execution information within a status event.
+///
+/// Holds detailed execution information about the current state of the ComfyUI
+/// service, such as the number of remaining items in the execution queue.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StatusEventDataStatus {
-    /// Execution information associated with the event.
+    /// Execution information including queue status and other execution
+    /// metrics.
     pub exec_info: ExecInfo,
 }
 
 /// Event payload for a progress update, including current value and maximum
 /// value.
+///
+/// This structure is received when ComfyUI reports progress of an operation,
+/// such as image generation or processing.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProgressEventData {
-    /// The current progress value.
+    /// The current progress value representing the completed steps.
     pub value: usize,
-    /// The maximum progress value.
+    /// The maximum progress value representing the total number of steps.
     pub max: usize,
 }
 
 /// Represents the output of an executed node.
+///
+/// Contains the results produced by a node in the workflow after successful
+/// execution, typically including generated or processed images.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Output {
-    /// A list of image file information objects.
+    /// A list of image file information objects generated or processed by the
+    /// node.
     pub images: Vec<FileInfo>,
 }
 
 /// Event payload for a completed execution, including the node identifier,
 /// prompt ID, and output data.
+///
+/// This structure is received when a specific node in the workflow completes
+/// execution and produces output, such as generated images.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecutedEventData {
     /// Identifier of the node that completed execution.
     pub node: String,
     /// The prompt ID associated with the execution.
     pub prompt_id: String,
-    /// The output generated by the executed node.
+    /// The output generated by the executed node, containing resulting images
+    /// or other data.
     pub output: Output,
 }
 
 /// Event payload for an execution in progress, including the node identifier
 /// and prompt ID.
+///
+/// This structure is received when ComfyUI begins executing a specific node in
+/// the workflow. It provides information about which node is currently being
+/// processed.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecutingEventData {
-    /// Identifier of the node currently executing.
+    /// Identifier of the node currently executing. May be None in certain
+    /// cases.
     pub node: Option<String>,
+    /// Optional display name of the executing node, providing a more
+    /// user-friendly identifier.
     pub display_node: Option<String>,
-    /// The prompt ID associated with the execution.
+    /// The prompt ID associated with the execution, linking this event to a
+    /// specific workflow run.
     pub prompt_id: String,
 }
 
 /// Event payload indicating that the execution has started.
+///
+/// This structure is received when ComfyUI begins executing a workflow.
+/// It serves as an initial notification that the workflow processing has begun
+/// and provides timing information for performance tracking.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecutionStartEventData {
-    /// The prompt ID for which the execution has started.
+    /// The prompt ID for which the execution has started, identifying the
+    /// workflow run.
     pub prompt_id: String,
+    /// Unix timestamp indicating when the execution started, useful for timing
+    /// analysis.
     pub timestamp: u64,
 }
 
 /// Event payload for an execution error, containing details about the error and
 /// its context.
+///
+/// This structure is received when an error occurs during workflow execution.
+/// It provides comprehensive information about the error, including where it
+/// occurred and the state of inputs and outputs at the time of the error.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecutionErrorEventData {
-    /// The prompt ID associated with the error.
+    /// The prompt ID associated with the error, identifying the workflow
+    /// execution.
     pub prompt_id: String,
-    /// The identifier of the node where the error occurred.
+    /// The identifier of the node where the error occurred within the workflow.
     pub node_id: String,
-    /// The type of the node where the error occurred.
+    /// The type of the node where the error occurred (e.g., "CLIPTextEncode",
+    /// "KSampler").
     pub node_type: String,
-    /// A list of node identifiers that were executed before the error.
+    /// A list of node identifiers that were successfully executed before the
+    /// error occurred.
     pub executed: Vec<String>,
-    /// The error message from the exception.
+    /// The error message from the exception, describing what went wrong.
     pub exception_message: String,
-    /// The type of the exception.
+    /// The type of the exception that was raised (e.g., "ValueError",
+    /// "RuntimeError").
     pub exception_type: String,
-    /// A traceback of the error as a list of strings.
+    /// A traceback of the error as a list of strings, showing the execution
+    /// path that led to the error.
     pub traceback: Vec<String>,
-    /// The current input values at the time of the error.
+    /// The current input values at the time of the error, mapping input names
+    /// to their values.
     pub current_inputs: HashMap<String, Value>,
-    /// The current output values at the time of the error.
+    /// The current output values at the time of the error, mapping output names
+    /// to their values.
     pub current_outputs: HashMap<String, Value>,
 }
 
 /// Event payload indicating that the execution result was obtained from the
-/// cache.
+/// cache rather than recalculated.
+///
+/// This structure is received when ComfyUI uses cached results for nodes in the
+/// workflow, which can significantly speed up execution when identical
+/// operations are performed.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecutionCachedEventData {
-    /// A list of node identifiers that were cached.
+    /// A list of node identifiers that were retrieved from the cache instead of
+    /// being re-executed.
     pub nodes: Vec<String>,
-    /// The prompt ID associated with the cached execution.
+    /// The prompt ID associated with the cached execution, linking this event
+    /// to a specific workflow run.
     pub prompt_id: String,
+    /// Unix timestamp indicating when the cached execution result was
+    /// retrieved, useful for timing analysis.
     pub timestamp: u64,
 }
 
 /// Event payload for an interrupted execution, containing details about the
 /// interruption.
+///
+/// This structure is received when the workflow execution is manually
+/// interrupted or terminated before completion, providing context about what
+/// was executing at the time of interruption.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecutionInterruptedEventData {
-    /// The prompt ID associated with the interruption.
+    /// The prompt ID associated with the interruption, identifying the workflow
+    /// execution that was stopped.
     pub prompt_id: String,
-    /// The identifier of the node where the execution was interrupted.
+    /// The identifier of the node where the execution was interrupted,
+    /// indicating which operation was in progress.
     pub node_id: String,
-    /// The type of the node that was interrupted.
+    /// The type of the node that was interrupted (e.g., "KSampler",
+    /// "VAEDecode"), helping identify what operation was stopped.
     pub node_type: String,
-    /// A list of node identifiers that were executed before the interruption.
+    /// A list of node identifiers that were successfully executed before the
+    /// interruption occurred.
     pub executed: Vec<String>,
 }
 
+/// Event payload indicating successful completion of workflow execution.
+///
+/// This structure is received when an entire workflow has completed execution
+/// successfully. It serves as a final notification that all nodes in the
+/// workflow have been processed without errors, and the workflow is complete.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ExecutionSuccessEventData {
+    /// The prompt ID associated with the successful execution, identifying the
+    /// completed workflow.
     pub prompt_id: String,
 }
 
@@ -263,8 +358,11 @@ mod tests {
     fn test_serialize_event() {
         let ev = Event::Status {
             data: StatusEventData {
-                status: ExecInfo { queue_remaining: 0 },
+                status: StatusEventDataStatus {
+                    exec_info: ExecInfo { queue_remaining: 0 },
+                },
             },
+            sid: None,
         };
         let value = serde_json::to_value(&ev).unwrap();
         assert_eq!(
@@ -273,15 +371,19 @@ mod tests {
                 "type": "status",
                 "data": {
                     "status": {
-                        "queue_remaining": 0,
+                        "exec_info": {
+                            "queue_remaining": 0,
+                        }
                     }
-                }
+                },
+                "sid": null
             })
         );
 
         let ev = Event::ExecutionStart {
             data: ExecutionStartEventData {
                 prompt_id: "xxxxxx".to_string(),
+                timestamp: 123456789,
             },
         };
         let value = serde_json::to_value(&ev).unwrap();
@@ -291,6 +393,7 @@ mod tests {
                 "type": "execution_start",
                 "data": {
                     "prompt_id": "xxxxxx",
+                    "timestamp": 123456789
                 }
             })
         );

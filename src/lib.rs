@@ -13,6 +13,7 @@ use bytes::Bytes;
 use cfg_if::cfg_if;
 use errors::{ApiBody, ApiError};
 use futures_util::StreamExt;
+use log::trace;
 use meta::{Event, History, OtherEvent, Prompt, PromptStatus};
 use reqwest::{
     Body, IntoUrl, Response,
@@ -31,7 +32,6 @@ use tokio_tungstenite::{
 };
 use url::Url;
 use uuid::Uuid;
-use log::trace;
 
 /// A builder for creating a [`ComfyUIClient`] instance.
 ///
