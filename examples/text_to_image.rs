@@ -195,6 +195,10 @@ async fn main() {
             _ => {
                 warn!("receive unhandled event type");
             }
+            Event::Other(ev) => {
+                warn!(ev:?; "receive other event");
+            }
+            _ => {}
         }
     }
 }

@@ -100,6 +100,17 @@ pub enum OtherEvent {
     ReconnectSuccess,
 }
 
+/// Represents events that are not part of the standard ComfyUI API
+/// but are added by the client for additional functionality.
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type", content = "data")]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum OtherEvent {
+    /// Event indicating a successful reconnection to the WebSocket.
+    ReconnectSuccess,
+}
+
 /// Event payload for a status event, containing execution information.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StatusEventData {
