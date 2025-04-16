@@ -1,6 +1,8 @@
+use crate::ClientError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::HashMap, fmt::Debug};
+use tokio_tungstenite::tungstenite;
 
 /// Contains information about a prompt, including its execution details.
 #[derive(Serialize, Deserialize, Debug)]
@@ -134,7 +136,11 @@ pub enum Event {
 #[non_exhaustive]
 pub enum OtherEvent {
     /// Event indicating a successful reconnection to the WebSocket.
-    ReconnectSuccess,
+    WSReconnectSuccess,
+    /// Event containing an error that occurred during a reconnection attempt.
+    WSReconnectError(ClientError),
+    /// Event containing an error that occurred while receiving messages.
+    WSReceiveError(tungstenite::Error),
 }
 
 /// Event payload for a status event, containing execution information.
