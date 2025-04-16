@@ -10,7 +10,6 @@ pub mod meta;
 pub use crate::errors::{ClientError, ClientResult};
 use crate::meta::{FileInfo, PromptInfo};
 use bytes::Bytes;
-use cfg_if::cfg_if;
 use errors::{ApiBody, ApiError};
 use futures_util::StreamExt;
 use log::trace;
@@ -25,13 +24,12 @@ use std::{
     ops::{Deref, DerefMut},
 };
 use tokio::{
-    net::TcpStream,
     sync::mpsc,
     task::JoinHandle,
     time::{Duration, sleep},
 };
 use tokio_stream::wrappers::ReceiverStream;
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite::Message};
+use tokio_tungstenite::{connect_async, tungstenite::Message};
 use url::Url;
 use uuid::Uuid;
 
@@ -82,38 +80,6 @@ impl ClientBuilder {
         self
     }
 
-    /// Helper method to establish a WebSocket connection
-    async fn connect_to_websocket(
-        ws_url: &Url,
-    ) -> ClientResult<WebSocketStream<MaybeTlsStream<TcpStream>>> {
-        let (stream, _) = if ws_url.scheme() == "wss" {
-            cfg_if! {
-                if #[cfg(feature = "rustls")] {
-                    let root_store = rustls::RootCertStore {
-                        roots: webpki_roots::TLS_SERVER_ROOTS.into(),
-                    };
-                    let config = rustls::ClientConfig::builder()
-                        .with_root_certificates(root_store)
-                        .with_no_client_auth();
-
-                    tokio_tungstenite::connect_async_tls_with_config(
-                        ws_url.clone(),
-                        None,
-                        false,
-                        Some(tokio_tungstenite::Connector::Rustls(std::sync::Arc::new(config))),
-                    )
-                    .await?
-                } else {
-                    connect_async(ws_url.clone()).await?
-                }
-            }
-        } else {
-            connect_async(ws_url.clone()).await?
-        };
-
-        Ok(stream)
-    }
-
     /// Builds the [`ComfyUIClient`] along with an associated [`EventStream`].
     ///
     /// This method establishes a websocket connection and spawns an
@@ -134,7 +100,7 @@ impl ClientBuilder {
         let ws_url = Self::generate_websocket_url(base_url.clone(), &client_id)?;
 
         // Initial connection
-        let ws_stream = Self::connect_to_websocket(&ws_url).await?;
+        let (ws_stream, _) = connect_async(&ws_url).await?;
 
         // Spawn the stream handling task with reconnection support
         let stream_handle = tokio::spawn(async move {
@@ -198,7 +164,7 @@ impl ClientBuilder {
                     }
 
                     // Try to establish a new connection
-                    match Self::connect_to_websocket(&ws_url).await {
+                    match connect_async(&ws_url).await.map(|x| x.0) {
                         Ok(new_stream) => {
                             // Successfully reconnected
                             (_, read_stream) = new_stream.split();
@@ -212,6 +178,7 @@ impl ClientBuilder {
                         }
                         Err(err) => {
                             // Failed to reconnect, send error as Event::Other
+                            let err = ClientError::Tungstenite(err);
                             if ev_tx
                                 .send(Ok(Event::Other(OtherEvent::WSReconnectError(err))))
                                 .await

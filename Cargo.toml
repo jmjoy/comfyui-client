@@ -9,24 +9,35 @@ repository = "https://github.com/jmjoy/comfyui-client"
 rust-version = "1.85"
 
 [features]
-rustls = ["dep:rustls", "reqwest/rustls-tls", "tokio-tungstenite/rustls-tls-native-roots", "webpki-roots"]
+default = ["native-tls"]
+
+native-tls = ["reqwest/native-tls", "tokio-tungstenite/native-tls"]
+rustls = ["reqwest/rustls-tls", "tokio-tungstenite/rustls-tls-webpki-roots"]
 
 [dependencies]
 bytes = "1.10.1"
-cfg-if = "1.0.0"
 futures-util = "0.3.31"
 log = { version = "0.4.26", features = ["kv"] }
-reqwest = { version = "0.12.12", features = ["json", "multipart", "stream"] }
-rustls = { version = "0.23.23", optional = true }
+reqwest = { version = "0.12.12", features = [
+	"json",
+	"multipart",
+	"stream",
+	"charset",
+	"http2",
+	"macos-system-configuration",
+], default-features = false }
 serde = { version = "1.0.218", features = ["derive"] }
 serde_json = "1.0.140"
 thiserror = "2.0.12"
 tokio = { version = "1.43.0", features = ["net", "sync"] }
 tokio-stream = "0.1.17"
-tokio-tungstenite = { version = "0.26.2", features = ["url"] }
+tokio-tungstenite = { version = "0.26.2", features = [
+	"connect",
+	"handshake",
+	"url",
+], default-features = false }
 url = "2.5.4"
 uuid = { version = "1.15.1", features = ["v4"] }
-webpki-roots = { version = "0.26.8", optional = true }
 
 [dev-dependencies]
 env_logger = { version = "0.11.6", features = ["unstable-kv"] }
