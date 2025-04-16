@@ -40,7 +40,7 @@ use uuid::Uuid;
 pub struct ClientBuilder {
     base_url: Url,
     channel_bound: usize,
-    reconnect: bool,
+    reconnect_web_socket: bool,
 }
 
 impl ClientBuilder {
@@ -58,8 +58,25 @@ impl ClientBuilder {
         Ok(Self {
             base_url: base_url.into_url()?,
             channel_bound: 100,
-            reconnect: true,
+            reconnect_web_socket: true,
         })
+    }
+
+    /// Sets the capacity of the internal channel used for event streaming.
+    ///
+    /// This controls how many events can be buffered before backpressure is
+    /// applied. The default value is 100.
+    ///
+    /// # Parameters
+    ///
+    /// - `channel_bound`: The maximum number of events the channel can hold.
+    ///
+    /// # Returns
+    ///
+    /// The updated [`ClientBuilder`] instance.
+    pub fn channel_bound(mut self, channel_bound: usize) -> Self {
+        self.channel_bound = channel_bound;
+        self
     }
 
     /// Sets whether the websocket should attempt to reconnect automatically
@@ -75,8 +92,8 @@ impl ClientBuilder {
     /// # Returns
     ///
     /// The updated [`ClientBuilder`] instance.
-    pub fn reconnect(mut self, reconnect: bool) -> Self {
-        self.reconnect = reconnect;
+    pub fn reconnect_web_socket(mut self, reconnect: bool) -> Self {
+        self.reconnect_web_socket = reconnect;
         self
     }
 
@@ -93,7 +110,7 @@ impl ClientBuilder {
         let base_url = self.base_url;
         let http_client = reqwest::Client::new();
         let client_id = Uuid::new_v4().to_string();
-        let reconnect = self.reconnect;
+        let reconnect_web_socket = self.reconnect_web_socket;
 
         let (ev_tx, ev_rx) = mpsc::channel(self.channel_bound);
 
@@ -128,7 +145,7 @@ impl ClientBuilder {
 
                             // If reconnect is enabled, wrap error in OtherEvent, otherwise pass
                             // through as ClientError
-                            if reconnect {
+                            if reconnect_web_socket {
                                 // Send receive error as an Event::Other
                                 let _ = ev_tx
                                     .send(Ok(Event::Other(OtherEvent::WSReceiveError(err))))
@@ -144,7 +161,7 @@ impl ClientBuilder {
                 }
 
                 // If reconnect is disabled or the channel is closed, exit the loop
-                if !reconnect || ev_tx.is_closed() {
+                if !reconnect_web_socket || ev_tx.is_closed() {
                     break;
                 }
 
