@@ -145,7 +145,7 @@ impl ClientBuilder {
 
                             // If reconnect is enabled, wrap error in OtherEvent, otherwise pass
                             // through as ClientError
-                            if reconnect {
+                            if reconnect_web_socket {
                                 // Send receive error as an Event::Other
                                 let _ = ev_tx
                                     .send(Ok(Event::Other(OtherEvent::WSReceiveError(err))))
