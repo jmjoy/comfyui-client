@@ -37,13 +37,13 @@ use uuid::Uuid;
 ///
 /// This builder helps initialize the client with the provided base URL and sets
 /// up a websocket connection to stream events.
-pub struct ClientBuilder {
-    base_url: Url,
+pub struct ClientBuilder<U> {
+    base_url: U,
     channel_bound: usize,
     reconnect_web_socket: bool,
 }
 
-impl ClientBuilder {
+impl<U: IntoUrl> ClientBuilder<U> {
     /// Creates a new [`ClientBuilder`] instance.
     ///
     /// # Parameters
@@ -54,12 +54,12 @@ impl ClientBuilder {
     ///
     /// A new instance of [`ClientBuilder`] wrapped in a `ClientResult`, or an
     /// error if the URL is invalid.
-    pub fn new(base_url: impl IntoUrl) -> ClientResult<Self> {
-        Ok(Self {
-            base_url: base_url.into_url()?,
+    pub fn new(base_url: U) -> Self {
+        Self {
+            base_url,
             channel_bound: 100,
             reconnect_web_socket: true,
-        })
+        }
     }
 
     /// Sets the capacity of the internal channel used for event streaming.
@@ -107,7 +107,7 @@ impl ClientBuilder {
     /// A tuple containing the [`ComfyUIClient`] and [`EventStream`] on success,
     /// or an error.
     pub async fn build(self) -> ClientResult<(ComfyUIClient, EventStream)> {
-        let base_url = self.base_url;
+        let base_url = self.base_url.into_url()?;
         let http_client = reqwest::Client::new();
         let client_id = Uuid::new_v4().to_string();
         let reconnect_web_socket = self.reconnect_web_socket;
@@ -242,7 +242,7 @@ impl ClientBuilder {
     ///
     /// A [`ComfyUIClient`] instance on success, or an error.
     pub async fn build_only_http(self) -> ClientResult<ComfyUIClient> {
-        let base_url = self.base_url;
+        let base_url = self.base_url.into_url()?;
         let http_client = reqwest::Client::new();
         let client_id = Uuid::new_v4().to_string();
 
@@ -517,5 +517,16 @@ impl DerefMut for EventStream {
     /// Allows mutable access to the inner [`ReceiverStream`].
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.rx_stream
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_builder() {
+        let _ = ClientBuilder::new("http://example.org/");
+        let _ = ClientBuilder::new("http://example.org/".parse::<Url>().unwrap());
     }
 }

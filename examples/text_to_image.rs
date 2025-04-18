@@ -134,7 +134,6 @@ async fn main() {
         .init();
 
     let (client, mut stream) = ClientBuilder::new("http://localhost:8188")
-        .unwrap()
         .build()
         .await
         .unwrap();
