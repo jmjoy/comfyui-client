@@ -1,4 +1,7 @@
-use comfyui_client::{ClientBuilder, meta::Event};
+use comfyui_client::{
+    ClientBuilder,
+    meta::{Event, ExecutedOutput},
+};
 use futures_util::StreamExt;
 use log::{debug, error, info, warn};
 use serde_json::json;
@@ -165,11 +168,13 @@ async fn main() {
             Event::Executed { data } => {
                 debug!(data:?; "receive executed event");
 
-                for image in data.output.images {
-                    let buf = client.get_view(&image).await.unwrap();
-                    let file_path = temp_dir().join(image.filename);
-                    fs::write(&file_path, &buf).await.unwrap();
-                    info!(file_path:% = file_path.display(); "write to file success");
+                if let Some(ExecutedOutput::Images(images)) = data.output {
+                    for image in images.images {
+                        let buf = client.get_view(&image).await.unwrap();
+                        let file_path = temp_dir().join(image.filename);
+                        fs::write(&file_path, &buf).await.unwrap();
+                        info!(file_path:% = file_path.display(); "write to file success");
+                    }
                 }
             }
             Event::ExecutionSuccess { data } => {
