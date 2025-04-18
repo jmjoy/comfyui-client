@@ -11,9 +11,10 @@ pub use crate::errors::{ClientError, ClientResult};
 use crate::meta::{FileInfo, PromptInfo};
 use bytes::Bytes;
 use errors::{ApiBody, ApiError};
-use futures_util::StreamExt;
+use futures_util::stream::{Stream, StreamExt};
 use log::trace;
 use meta::{Event, History, OtherEvent, Prompt, PromptStatus};
+use pin_project_lite::pin_project;
 use reqwest::{
     Body, IntoUrl, Response,
     multipart::{self},
@@ -21,7 +22,8 @@ use reqwest::{
 use serde_json::{Value, json};
 use std::{
     collections::HashMap,
-    ops::{Deref, DerefMut},
+    pin::Pin,
+    task::{Context, Poll},
 };
 use tokio::{
     sync::mpsc,
@@ -97,16 +99,24 @@ impl<U: IntoUrl> ClientBuilder<U> {
         self
     }
 
-    /// Builds the [`ComfyUIClient`] along with an associated [`EventStream`].
+    /// Builds the [`ComfyUIClient`] along with an associated [`EventStream`]
+    /// and a background task handle.
     ///
     /// This method establishes a websocket connection and spawns an
-    /// asynchronous task to process incoming messages.
+    /// asynchronous task to process incoming messages. If reconnection is
+    /// enabled, the task will automatically attempt to reconnect when the
+    /// WebSocket connection drops unexpectedly.
     ///
     /// # Returns
     ///
-    /// A tuple containing the [`ComfyUIClient`] and [`EventStream`] on success,
-    /// or an error.
-    pub async fn build(self) -> ClientResult<(ComfyUIClient, EventStream)> {
+    /// A tuple containing:
+    /// - The [`ComfyUIClient`] for HTTP API interactions
+    /// - An [`EventStream`] for receiving real-time events
+    /// - A [`JoinHandle`] for the background task that manages the WebSocket
+    ///   connection
+    ///
+    /// Returns an error if the initial connection cannot be established.
+    pub async fn build(self) -> ClientResult<(ComfyUIClient, EventStream, JoinHandle<()>)> {
         let base_url = self.base_url.into_url()?;
         let http_client = reqwest::Client::new();
         let client_id = Uuid::new_v4().to_string();
@@ -223,12 +233,9 @@ impl<U: IntoUrl> ClientBuilder<U> {
             client_id,
         };
 
-        let stream = EventStream {
-            stream_handle,
-            rx_stream,
-        };
+        let stream = EventStream { rx_stream };
 
-        Ok((client, stream))
+        Ok((client, stream, stream_handle))
     }
 
     /// Builds a [`ComfyUIClient`] instance configured for HTTP-only
@@ -456,13 +463,21 @@ impl ComfyUIClient {
     }
 }
 
-/// A structure representing the event stream received via a websocket
-/// connection.
-///
-/// This stream continuously processes events from the ComfyUI service.
-pub struct EventStream {
-    stream_handle: JoinHandle<()>,
-    rx_stream: ReceiverStream<ClientResult<Event>>,
+pin_project! {
+    /// A structure representing the event stream received via a websocket connection.
+    ///
+    /// This stream continuously processes events from the ComfyUI service.
+    /// It handles WebSocket connection management including automatic reconnection
+    /// when enabled through the [`ClientBuilder`].
+    ///
+    /// The stream emits various events including execution status updates, errors,
+    /// and connection state changes. All WebSocket communication is managed by a
+    /// background task, allowing the stream to be consumed without worrying about
+    /// connection details.
+    pub struct EventStream {
+        #[pin]
+        rx_stream: ReceiverStream<ClientResult<Event>>,
+    }
 }
 
 impl EventStream {
@@ -470,12 +485,13 @@ impl EventStream {
     /// [`Event`].
     ///
     /// For text messages, it tries to deserialize the message into an
-    /// [`Event`]. If the deserialization fails, it wraps the message as
-    /// [`Event::Unknown`]. Other message types are ignored.
+    /// [`Event`]. If deserialization fails, it wraps the message as
+    /// [`Event::Unknown`]. Non-text message types are ignored and return
+    /// `None`.
     ///
     /// # Parameters
     ///
-    /// - `msg`: A result containing a [`Message`] from the websocket.
+    /// - `msg`: A [`Message`] from the websocket.
     ///
     /// # Returns
     ///
@@ -496,27 +512,16 @@ impl EventStream {
     }
 }
 
-impl Drop for EventStream {
-    /// When the [`EventStream`] is dropped, abort the associated websocket
-    /// handling task.
-    fn drop(&mut self) {
-        self.stream_handle.abort();
+impl Stream for EventStream {
+    type Item = ClientResult<Event>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.project();
+        this.rx_stream.poll_next(cx)
     }
-}
 
-impl Deref for EventStream {
-    type Target = ReceiverStream<ClientResult<Event>>;
-
-    /// Allows access to the inner [`ReceiverStream`] containing the events.
-    fn deref(&self) -> &Self::Target {
-        &self.rx_stream
-    }
-}
-
-impl DerefMut for EventStream {
-    /// Allows mutable access to the inner [`ReceiverStream`].
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.rx_stream
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.rx_stream.size_hint()
     }
 }
 

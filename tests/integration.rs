@@ -8,14 +8,15 @@ use tokio_stream::StreamExt;
 #[tokio::test]
 async fn test_get_prompt() {
     common::setup();
-    let (client, _) = common::build_client().await;
+    let (client, _, handle) = common::build_client().await;
     client.get_prompt().await.unwrap();
+    handle.abort();
 }
 
 #[tokio::test]
 async fn test_integration() {
     common::setup();
-    let (client, mut stream) = common::build_client().await;
+    let (client, mut stream, handle) = common::build_client().await;
 
     let file = File::open("./tests/data/cat.webp").await.unwrap();
     let file_info = FileInfo {
@@ -64,4 +65,6 @@ async fn test_integration() {
     let image2_buf = client.get_view(&image).await.unwrap();
 
     assert_eq!(image_buf, image2_buf);
+
+    handle.abort();
 }

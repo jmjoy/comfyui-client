@@ -18,6 +18,7 @@ rustls = ["reqwest/rustls-tls", "tokio-tungstenite/rustls-tls-webpki-roots"]
 bytes = "1.10.1"
 futures-util = "0.3.31"
 log = { version = "0.4.26", features = ["kv"] }
+pin-project-lite = "0.2.16"
 reqwest = { version = "0.12.12", features = [
 	"json",
 	"multipart",
