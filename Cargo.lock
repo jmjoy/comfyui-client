@@ -177,6 +177,7 @@ dependencies = [
  "env_logger",
  "futures-util",
  "log",
+ "pin-project-lite",
  "reqwest",
  "serde",
  "serde_json",

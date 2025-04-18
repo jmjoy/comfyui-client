@@ -136,7 +136,7 @@ async fn main() {
         .filter_level(log::LevelFilter::Debug)
         .init();
 
-    let (client, mut stream) = ClientBuilder::new("http://localhost:8188")
+    let (client, mut stream, handle) = ClientBuilder::new("http://localhost:8188")
         .build()
         .await
         .unwrap();
@@ -200,4 +200,6 @@ async fn main() {
             }
         }
     }
+
+    handle.abort();
 }
