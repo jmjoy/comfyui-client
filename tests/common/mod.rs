@@ -10,7 +10,6 @@ pub fn setup() {
 
 pub async fn build_client() -> (ComfyUIClient, EventStream) {
     ClientBuilder::new("http://localhost:8188")
-        .unwrap()
         .build()
         .await
         .unwrap()
