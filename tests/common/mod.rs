@@ -4,7 +4,9 @@ use std::sync::Once;
 pub fn setup() {
     static START: Once = Once::new();
     START.call_once(|| {
-        env_logger::init();
+        env_logger::builder()
+            .filter_level(log::LevelFilter::Debug)
+            .init();
     });
 }
 
