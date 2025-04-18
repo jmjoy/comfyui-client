@@ -9,6 +9,20 @@
 
 Rust client for [ComfyUI](https://github.com/comfyanonymous/ComfyUI).
 
+## API Reference
+
+The following table lists the available APIs in ComfyUIClient:
+
+| Method | URL | Purpose | Client Method |
+|--------|-----|---------|---------------|
+| GET | `/history/{prompt_id}` | Retrieves the history for a specified prompt | `get_history` |
+| GET | `/prompt` | Retrieves the current prompt information | `get_prompt` |
+| GET | `/view` | Retrieves view data for a file (e.g., images) | `get_view` |
+| POST | `/prompt` | Sends a prompt in JSON format | `post_prompt` |
+| POST | `/upload/image` | Uploads an image to ComfyUI | `upload_image` |
+
+Additionally, the client establishes a WebSocket connection to `/ws` to receive real-time events from ComfyUI.
+
 ## Examples
 
 Refer to [examples](https://github.com/jmjoy/comfyui-client/tree/master/examples).
