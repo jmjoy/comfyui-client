@@ -5,21 +5,21 @@ use std::{collections::HashMap, fmt::Debug};
 use tokio_tungstenite::tungstenite;
 
 /// Contains information about a prompt, including its execution details.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PromptInfo {
     /// Execution information related to the prompt.
     pub exec_info: ExecInfo,
 }
 
 /// Contains execution details such as the remaining queue length.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ExecInfo {
     /// The number of remaining tasks in the execution queue.
     pub queue_remaining: usize,
 }
 
 /// Represents file information including filename, subfolder, and file type.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct FileInfo {
     /// The name of the file.
     #[serde(alias = "name")]
@@ -31,7 +31,7 @@ pub struct FileInfo {
 }
 
 /// Represents a prompt with an identifier, a number, and potential node errors.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PromptStatus {
     /// Unique identifier for the prompt.
     pub prompt_id: String,
@@ -42,17 +42,19 @@ pub struct PromptStatus {
 }
 
 /// Represents the history of outputs for a prompt.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct History {
     /// A mapping of output identifiers to their corresponding images.
     pub outputs: HashMap<String, Images>,
 }
 
 /// Contains an optional list of image file information.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Images {
     /// A vector of file information objects, if available.
     pub images: Option<Vec<FileInfo>>,
+    /// A vector of animated file information objects, if available.
+    pub gifs: Option<Vec<FileInfo>>,
 }
 
 /// Represents events emitted by the ComfyUI client during workflow execution.
@@ -170,7 +172,7 @@ pub enum ConnectionEvent {
 ///
 /// This structure is received when ComfyUI sends a status update, typically
 /// containing information about the current execution queue state.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct StatusEventData {
     /// Execution information associated with the event, including queue
     /// details.
@@ -181,7 +183,7 @@ pub struct StatusEventData {
 ///
 /// Holds detailed execution information about the current state of the ComfyUI
 /// service, such as the number of remaining items in the execution queue.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct StatusEventStatus {
     /// Execution information including queue status and other execution
     /// metrics.
@@ -193,7 +195,7 @@ pub struct StatusEventStatus {
 ///
 /// This structure is received when ComfyUI reports progress of an operation,
 /// such as image generation or processing.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ProgressEventData {
     /// The current progress value representing the completed steps.
     pub value: usize,
@@ -206,7 +208,7 @@ pub struct ProgressEventData {
 /// Contains the results produced by a node in the workflow after successful
 /// execution. This can include generated or processed images in the `images`
 /// field, as well as other arbitrary output data in the `others` map.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ExecutedOutput {
     /// Optional list of image file information objects generated or processed
     /// by the node.
@@ -221,7 +223,7 @@ pub struct ExecutedOutput {
 ///
 /// This structure is received when a specific node in the workflow completes
 /// execution and produces output, such as generated images.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ExecutedEventData {
     /// Identifier of the node that completed execution.
     pub node: String,
@@ -238,7 +240,7 @@ pub struct ExecutedEventData {
 /// This structure is received when ComfyUI begins executing a specific node in
 /// the workflow. It provides information about which node is currently being
 /// processed.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ExecutingEventData {
     /// Identifier of the node currently executing. May be None in certain
     /// cases.
@@ -256,7 +258,7 @@ pub struct ExecutingEventData {
 /// This structure is received when ComfyUI begins executing a workflow.
 /// It serves as an initial notification that the workflow processing has begun
 /// and provides timing information for performance tracking.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ExecutionStartEventData {
     /// The prompt ID for which the execution has started, identifying the
     /// workflow run.
@@ -272,7 +274,7 @@ pub struct ExecutionStartEventData {
 /// This structure is received when an error occurs during workflow execution.
 /// It provides comprehensive information about the error, including where it
 /// occurred and the state of inputs and outputs at the time of the error.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ExecutionErrorEventData {
     /// The prompt ID associated with the error, identifying the workflow
     /// execution.
@@ -307,7 +309,7 @@ pub struct ExecutionErrorEventData {
 /// This structure is received when ComfyUI uses cached results for nodes in the
 /// workflow, which can significantly speed up execution when identical
 /// operations are performed.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ExecutionCachedEventData {
     /// A list of node identifiers that were retrieved from the cache instead of
     /// being re-executed.
@@ -326,7 +328,7 @@ pub struct ExecutionCachedEventData {
 /// This structure is received when the workflow execution is manually
 /// interrupted or terminated before completion, providing context about what
 /// was executing at the time of interruption.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ExecutionInterruptedEventData {
     /// The prompt ID associated with the interruption, identifying the workflow
     /// execution that was stopped.
@@ -347,7 +349,7 @@ pub struct ExecutionInterruptedEventData {
 /// This structure is received when an entire workflow has completed execution
 /// successfully. It serves as a final notification that all nodes in the
 /// workflow have been processed without errors, and the workflow is complete.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ExecutionSuccessEventData {
     /// The prompt ID associated with the successful execution, identifying the
     /// completed workflow.
