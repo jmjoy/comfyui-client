@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/jmjoy/comfyui-client/compare/v0.2.0...v0.3.0) - 2025-04-19
+
+### Other
+
+- update event handling to use ComfyEvent and ConnectionEvent ([#23](https://github.com/jmjoy/comfyui-client/pull/23))
+- remove JoinHandle from ClientBuilder and related functions ([#22](https://github.com/jmjoy/comfyui-client/pull/22))
+- update ClientBuilder to return a JoinHandle for background task management ([#21](https://github.com/jmjoy/comfyui-client/pull/21))
+- update README with API reference and WebSocket connection details ([#20](https://github.com/jmjoy/comfyui-client/pull/20))
+- enhance logging setup in test environment ([#19](https://github.com/jmjoy/comfyui-client/pull/19))
+- enhance event handling and output structure in meta and integration tests ([#18](https://github.com/jmjoy/comfyui-client/pull/18))
+- update ClientBuilder to accept generic URL type and improve CI configuration ([#17](https://github.com/jmjoy/comfyui-client/pull/17))
+
 ## [0.2.0](https://github.com/jmjoy/comfyui-client/compare/v0.1.2...v0.2.0) - 2025-04-16
 
 ### Other
