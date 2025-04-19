@@ -1,6 +1,6 @@
 use comfyui_client::{
     ClientBuilder,
-    meta::{ComfyEvent, ConnectionEvent, Event},
+    meta::{ComfyEvent, Event},
 };
 use futures_util::StreamExt;
 use log::{debug, error, info, warn};
@@ -197,20 +197,9 @@ async fn main() {
                     }
                 }
             },
-            Event::Connection(connection_event) => match connection_event {
-                ConnectionEvent::WSReconnectSuccess => {
-                    info!("websocket reconnection successful");
-                }
-                ConnectionEvent::WSReconnectError(err) => {
-                    warn!(error:?=err; "websocket reconnection error");
-                }
-                ConnectionEvent::WSReceiveError(err) => {
-                    warn!(error:?=err; "websocket receive error");
-                }
-                _ => {
-                    warn!("receive unhandled connection event");
-                }
-            },
+            Event::Connection(event) => {
+                warn!(event:?; "receive connection event");
+            }
             _ => {
                 warn!("receive unhandled event type");
             }
