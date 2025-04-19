@@ -1,6 +1,6 @@
 use comfyui_client::{
     ClientBuilder,
-    meta::{Event, ExecutedOutput},
+    meta::{ComfyEvent, ConnectionEvent, Event},
 };
 use futures_util::StreamExt;
 use log::{debug, error, info, warn};
@@ -150,51 +150,70 @@ async fn main() {
     while let Some(ev) = stream.next().await {
         let ev = ev.unwrap();
         match ev {
-            Event::Status { data, sid } => {
-                debug!(data:?, sid:?; "receive status event");
-            }
-            Event::ExecutionStart { data } => {
-                debug!(data:?; "receive execution status event");
-            }
-            Event::ExecutionCached { data } => {
-                debug!(data:?; "receive execution cached event");
-            }
-            Event::Progress { data } => {
-                debug!(data:?; "receive process event");
-            }
-            Event::Executing { data } => {
-                debug!(data:?; "receive executing event");
-            }
-            Event::Executed { data } => {
-                debug!(data:?; "receive executed event");
+            Event::Comfy(comfy_event) => match comfy_event {
+                ComfyEvent::Status { data, sid } => {
+                    debug!(data:?, sid:?; "receive status event");
+                }
+                ComfyEvent::ExecutionStart { data } => {
+                    debug!(data:?; "receive execution status event");
+                }
+                ComfyEvent::ExecutionCached { data } => {
+                    debug!(data:?; "receive execution cached event");
+                }
+                ComfyEvent::Progress { data } => {
+                    debug!(data:?; "receive process event");
+                }
+                ComfyEvent::Executing { data } => {
+                    debug!(data:?; "receive executing event");
+                }
+                ComfyEvent::Executed { data } => {
+                    debug!(data:?; "receive executed event");
 
-                if let Some(ExecutedOutput::Images(images)) = data.output {
-                    for image in images.images {
-                        let buf = client.get_view(&image).await.unwrap();
-                        let file_path = temp_dir().join(image.filename);
-                        fs::write(&file_path, &buf).await.unwrap();
-                        info!(file_path:% = file_path.display(); "write to file success");
+                    if let Some(output) = &data.output {
+                        if let Some(images) = &output.images {
+                            for image in images {
+                                let buf = client.get_view(image).await.unwrap();
+                                let file_path = temp_dir().join(&image.filename);
+                                fs::write(&file_path, &buf).await.unwrap();
+                                info!(file_path:% = file_path.display(); "write to file success");
+                            }
+                        }
                     }
                 }
-            }
-            Event::ExecutionSuccess { data } => {
-                debug!(data:?; "receive execution success event");
-                break;
-            }
-            Event::ExecutionError { data } => {
-                error!(data:?; "receive execution error event");
-            }
-            Event::ExecutionInterrupted { data } => {
-                error!(data:?; "receive execution_interrupted_event");
-            }
-            Event::Unknown(event) => {
-                if event["type"] != json!("crystools.monitor") {
-                    warn!(event:?; "receive unknown event");
+                ComfyEvent::ExecutionSuccess { data } => {
+                    debug!(data:?; "receive execution success event");
+                    break;
                 }
-            }
-            Event::Other(event) => {
-                warn!(event:?; "receive other event");
-            }
+                ComfyEvent::ExecutionError { data } => {
+                    error!(data:?; "receive execution error event");
+                }
+                ComfyEvent::ExecutionInterrupted { data } => {
+                    error!(data:?; "receive execution_interrupted_event");
+                }
+                ComfyEvent::Unknown(event) => {
+                    // exclude monitoring events of `ComfyUI-Crystools` plugin
+                    if event["type"] != json!("crystools.monitor") {
+                        warn!(event:?; "receive unknown comfy event");
+                    }
+                }
+                _ => {
+                    warn!("receive unhandled comfy event");
+                }
+            },
+            Event::Connection(connection_event) => match connection_event {
+                ConnectionEvent::WSReconnectSuccess => {
+                    info!("websocket reconnection successful");
+                }
+                ConnectionEvent::WSReconnectError(err) => {
+                    warn!(error:?=err; "websocket reconnection error");
+                }
+                ConnectionEvent::WSReceiveError(err) => {
+                    warn!(error:?=err; "websocket receive error");
+                }
+                _ => {
+                    warn!("receive unhandled connection event");
+                }
+            },
             _ => {
                 warn!("receive unhandled event type");
             }
