@@ -1,7 +1,7 @@
 mod common;
 
 use bytes::Bytes;
-use comfyui_client::meta::{Event, ExecutedOutput, FileInfo};
+use comfyui_client::meta::{ComfyEvent, Event, FileInfo};
 use tokio::fs::{self, File};
 use tokio_stream::StreamExt;
 
@@ -36,11 +36,13 @@ async fn test_integration() {
     'stream: while let Some(ev) = stream.next().await {
         let ev = ev.unwrap();
 
-        if let Event::Executed { data } = ev {
-            let Some(ExecutedOutput::Images(images)) = data.output else {
+        if let Event::Comfy(ComfyEvent::Executed { data }) = ev {
+            let Some(output) = data.output else {
                 continue;
             };
-            let images = images.images;
+            let Some(images) = output.images else {
+                continue;
+            };
             assert_eq!(images.len(), 1);
 
             image_buf = client.get_view(&images[0]).await.unwrap();
@@ -74,9 +76,9 @@ async fn test_integration_with_stream_ext() {
     let mut stream = stream
         .filter_map(|result| result.ok())
         .filter_map(|ev| {
-            if let Event::Executed { data } = ev {
-                if let Some(ExecutedOutput::Images(images)) = data.output {
-                    Some(images.images)
+            if let Event::Comfy(ComfyEvent::Executed { data }) = ev {
+                if let Some(output) = data.output {
+                    output.images
                 } else {
                     None
                 }

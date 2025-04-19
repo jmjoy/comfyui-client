@@ -13,7 +13,7 @@ use bytes::Bytes;
 use errors::{ApiBody, ApiError};
 use futures_util::stream::{Stream, StreamExt};
 use log::trace;
-use meta::{Event, History, OtherEvent, Prompt, PromptStatus};
+use meta::{ComfyEvent, ConnectionEvent, Event, History, Prompt, PromptStatus};
 use pin_project_lite::pin_project;
 use reqwest::{
     Body, IntoUrl, Response,
@@ -156,7 +156,7 @@ impl<U: IntoUrl> ClientBuilder<U> {
                                     if reconnect_web_socket {
                                         // Send receive error as an Event::Other
                                         if ev_tx
-                                            .send(Ok(Event::Other(OtherEvent::WSReceiveError(err))))
+                                            .send(Ok(Event::Connection(ConnectionEvent::WSReceiveError(err))))
                                             .await.is_err() {
                                                 return;
                                             }
@@ -210,7 +210,7 @@ impl<U: IntoUrl> ClientBuilder<U> {
                                     (_, read_stream) = new_stream.0.split();
                                     // Send reconnection success event
                                     if ev_tx
-                                        .send(Ok(Event::Other(OtherEvent::WSReconnectSuccess)))
+                                        .send(Ok(Event::Connection(ConnectionEvent::WSReconnectSuccess)))
                                         .await.is_err() {
                                             // Channel is closed, exit immediately
                                             return;
@@ -222,7 +222,7 @@ impl<U: IntoUrl> ClientBuilder<U> {
                                     // Failed to reconnect, send error as Event::Other
                                     let err = ClientError::Tungstenite(err);
                                     if ev_tx
-                                        .send(Ok(Event::Other(OtherEvent::WSReconnectError(err))))
+                                        .send(Ok(Event::Connection(ConnectionEvent::WSReconnectError(err))))
                                         .await
                                         .is_err()
                                     {
@@ -488,10 +488,12 @@ pin_project! {
     /// It handles WebSocket connection management including automatic reconnection
     /// when enabled through the [`ClientBuilder`].
     ///
-    /// The stream emits various events including execution status updates, errors,
-    /// and connection state changes. All WebSocket communication is managed by a
-    /// background task, allowing the stream to be consumed without worrying about
-    /// connection details.
+    /// The stream emits various events including:
+    /// - ComfyUI service events (execution status, errors, etc.) via `Event::Comfy`
+    /// - WebSocket connection state changes via `Event::Connection`
+    ///
+    /// All WebSocket communication is managed by a background task, allowing the stream
+    /// to be consumed without worrying about connection details.
     pub struct EventStream {
         #[pin]
         rx_stream: ReceiverStream<ClientResult<Event>>,
@@ -502,10 +504,11 @@ impl EventStream {
     /// Handles a single websocket message and attempts to parse it as an
     /// [`Event`].
     ///
-    /// For text messages, it tries to deserialize the message into an
-    /// [`Event`]. If deserialization fails, it wraps the message as
-    /// [`Event::Unknown`]. Non-text message types are ignored and return
-    /// `None`.
+    /// For text messages, it tries to deserialize the message into a
+    /// [`ComfyEvent`] and wraps it in `Event::Comfy`.
+    /// If deserialization fails, it wraps the raw value as
+    /// `Event::Comfy(ComfyEvent::Unknown)`.
+    /// Non-text message types are ignored and return `None`.
     ///
     /// # Parameters
     ///
@@ -520,9 +523,9 @@ impl EventStream {
             Message::Text(b) => {
                 trace!(message:% = b.as_str(); "received websocket message");
                 let value = serde_json::from_slice::<Value>(b.as_bytes())?;
-                match serde_json::from_value::<Event>(value.clone()) {
-                    Ok(ev) => Ok(Some(ev)),
-                    Err(_) => Ok(Some(Event::Unknown(value))),
+                match serde_json::from_value::<ComfyEvent>(value.clone()) {
+                    Ok(ev) => Ok(Some(Event::Comfy(ev))),
+                    Err(_) => Ok(Some(Event::Comfy(ComfyEvent::Unknown(value)))),
                 }
             }
             _ => Ok(None),

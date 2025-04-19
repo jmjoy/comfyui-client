@@ -55,18 +55,28 @@ pub struct Images {
     pub images: Option<Vec<FileInfo>>,
 }
 
+/// Represents events emitted by the ComfyUI client during workflow execution.
+///
+/// This structure allows for clear separation between service-level events and
+/// client-side connection management events.
+#[non_exhaustive]
+pub enum Event {
+    /// `Comfy` events originate from the ComfyUI service itself
+    Comfy(ComfyEvent),
+    /// `Connection` events relate to WebSocket connection management
+    Connection(ConnectionEvent),
+}
+
 /// Represents events emitted by the ComfyUI service during workflow execution.
 ///
 /// This enum encapsulates various event types that occur during the lifecycle
 /// of a workflow, from queuing to completion. Each variant contains specific
 /// data relevant to that event type. The `Unknown` variant captures any
-/// unrecognized events from the API, while the `Other` variant
-/// holds client-specific events not part of the standard ComfyUI API.
+/// unrecognized events from the API.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum Event {
+pub enum ComfyEvent {
     /// A status event containing queue and execution information.
     Status {
         /// Data payload for the status event, including execution information.
@@ -124,10 +134,6 @@ pub enum Event {
     /// explicitly defined.
     #[serde(skip)]
     Unknown(Value),
-    /// Events that are not part of the ComfyUI API but are added by the client
-    /// for internal functionality.
-    #[serde(skip)]
-    Other(OtherEvent),
 }
 
 /// Represents events that are not part of the standard ComfyUI API
@@ -139,7 +145,7 @@ pub enum Event {
 /// protocol.
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum OtherEvent {
+pub enum ConnectionEvent {
     /// Event indicating a successful reconnection to the WebSocket.
     ///
     /// Emitted when the client successfully reestablishes a connection after
@@ -198,25 +204,16 @@ pub struct ProgressEventData {
 /// Represents the output of an executed node.
 ///
 /// Contains the results produced by a node in the workflow after successful
-/// execution, typically including generated or processed images.
+/// execution. This can include generated or processed images in the `images`
+/// field, as well as other arbitrary output data in the `others` map.
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(untagged)]
-pub enum ExecutedOutput {
-    /// A list of image file information objects generated or processed by the
-    /// node.
-    Images(ExecutedOutputImages),
-    /// The message generated or processed by the node.
-    Other(Value),
-}
-
-/// Container for image outputs from an executed node.
-///
-/// Holds a collection of image file information objects that represent
-/// the images generated or processed by a node during workflow execution.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ExecutedOutputImages {
-    /// Vector of file information objects for images produced by the node.
-    pub images: Vec<FileInfo>,
+pub struct ExecutedOutput {
+    /// Optional list of image file information objects generated or processed
+    /// by the node.
+    pub images: Option<Vec<FileInfo>>,
+    /// Additional output data that doesn't fit into predefined categories.
+    #[serde(flatten)]
+    pub others: HashMap<String, Value>,
 }
 
 /// Event payload for a completed execution, including the node identifier,
@@ -403,7 +400,7 @@ mod tests {
     /// Tests serialization of different event types.
     #[test]
     fn test_serialize_event() {
-        let ev = Event::Status {
+        let ev = ComfyEvent::Status {
             data: StatusEventData {
                 status: StatusEventStatus {
                     exec_info: ExecInfo { queue_remaining: 0 },
@@ -427,7 +424,7 @@ mod tests {
             })
         );
 
-        let ev = Event::ExecutionStart {
+        let ev = ComfyEvent::ExecutionStart {
             data: ExecutionStartEventData {
                 prompt_id: "xxxxxx".to_string(),
                 timestamp: 123456789,
