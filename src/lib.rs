@@ -27,7 +27,6 @@ use std::{
 };
 use tokio::{
     sync::mpsc,
-    task::JoinHandle,
     time::{Duration, sleep},
 };
 use tokio_stream::wrappers::ReceiverStream;
@@ -116,7 +115,7 @@ impl<U: IntoUrl> ClientBuilder<U> {
     ///   connection
     ///
     /// Returns an error if the initial connection cannot be established.
-    pub async fn build(self) -> ClientResult<(ComfyUIClient, EventStream, JoinHandle<()>)> {
+    pub async fn build(self) -> ClientResult<(ComfyUIClient, EventStream)> {
         let base_url = self.base_url.into_url()?;
         let http_client = reqwest::Client::new();
         let client_id = Uuid::new_v4().to_string();
@@ -130,97 +129,114 @@ impl<U: IntoUrl> ClientBuilder<U> {
         let (ws_stream, _) = connect_async(&ws_url).await?;
 
         // Spawn the stream handling task with reconnection support
-        let stream_handle = tokio::spawn(async move {
+        tokio::spawn(async move {
             let (_, mut read_stream) = ws_stream.split();
 
             loop {
-                let mut connection_alive = true;
+                // Process messages until the connection drops or channel is closed
+                loop {
+                    tokio::select! {
+                        // Check for new WebSocket messages
+                        msg = read_stream.next() => {
+                            match msg {
+                                Some(Ok(message)) => {
+                                    let ev = EventStream::handle_message(message);
+                                    let Some(ev) = ev.transpose() else {
+                                        continue;
+                                    };
+                                    if ev_tx.send(ev).await.is_err() {
+                                        return;
+                                    }
+                                }
+                                Some(Err(err)) => {
+                                    // If reconnect is enabled, wrap error in OtherEvent, otherwise pass
+                                    // through as ClientError
+                                    if reconnect_web_socket {
+                                        // Send receive error as an Event::Other
+                                        if ev_tx
+                                            .send(Ok(Event::Other(OtherEvent::WSReceiveError(err))))
+                                            .await.is_err() {
+                                                return;
+                                            }
+                                    } else {
+                                        // Without reconnect, send as ClientError
+                                        if ev_tx.send(Err(ClientError::from(err))).await.is_err() {
+                                            return;
+                                        }
+                                    }
 
-                // Process messages until the connection drops
-                while let Some(msg) = read_stream.next().await {
-                    match msg {
-                        Ok(message) => {
-                            let ev = EventStream::handle_message(message);
-                            let Some(ev) = ev.transpose() else {
-                                continue;
-                            };
-                            if ev_tx.send(ev).await.is_err() {
-                                connection_alive = false;
-                                break;
+                                    break;
+                                }
+                                None => {
+                                    break;
+                                }
                             }
                         }
-                        Err(err) => {
-                            // Connection error occurred
-                            connection_alive = false;
 
-                            // If reconnect is enabled, wrap error in OtherEvent, otherwise pass
-                            // through as ClientError
-                            if reconnect_web_socket {
-                                // Send receive error as an Event::Other
-                                let _ = ev_tx
-                                    .send(Ok(Event::Other(OtherEvent::WSReceiveError(err))))
-                                    .await;
-                            } else {
-                                // Without reconnect, send as ClientError
-                                let _ = ev_tx.send(Err(ClientError::from(err))).await;
-                            }
-
-                            break;
+                        // Check if the channel is closed
+                        _ = ev_tx.closed() => {
+                            // Channel is closed, exit immediately
+                            return;
                         }
                     }
                 }
 
-                // If reconnect is disabled or the channel is closed, exit the loop
-                if !reconnect_web_socket || ev_tx.is_closed() {
-                    break;
-                }
-
-                // Exit when connection is closed normally without errors
-                if connection_alive {
-                    break;
+                // If reconnect is disabled, exit the loop
+                if !reconnect_web_socket {
+                    return;
                 }
 
                 // Attempt to reconnect with a small delay until successful or channel closed
-                // Keep trying to reconnect until successful
                 loop {
-                    sleep(Duration::from_secs(1)).await;
+                    tokio::select! {
+                        _ = sleep(Duration::from_secs(1)) => {
+                        }
 
-                    // Check if channel is closed before attempting reconnection
-                    if ev_tx.is_closed() {
-                        break;
+                        // Check if the channel is closed
+                        _ = ev_tx.closed() => {
+                            // Channel is closed, exit immediately
+                            return;
+                        }
                     }
 
                     // Try to establish a new connection
-                    match connect_async(&ws_url).await.map(|x| x.0) {
-                        Ok(new_stream) => {
-                            // Successfully reconnected
-                            (_, read_stream) = new_stream.split();
-                            // Send reconnection success event
-                            let _ = ev_tx
-                                .send(Ok(Event::Other(OtherEvent::WSReconnectSuccess)))
-                                .await;
-                            // Break out of the reconnection loop and continue with the new
-                            // connection
-                            break;
-                        }
-                        Err(err) => {
-                            // Failed to reconnect, send error as Event::Other
-                            let err = ClientError::Tungstenite(err);
-                            if ev_tx
-                                .send(Ok(Event::Other(OtherEvent::WSReconnectError(err))))
-                                .await
-                                .is_err()
-                            {
-                                // If channel closed during error sending, exit
-                                break;
+                    tokio::select! {
+                        conn_result = connect_async(&ws_url) => {
+                            match conn_result {
+                                Ok(new_stream) => {
+                                    // Successfully reconnected
+                                    (_, read_stream) = new_stream.0.split();
+                                    // Send reconnection success event
+                                    if ev_tx
+                                        .send(Ok(Event::Other(OtherEvent::WSReconnectSuccess)))
+                                        .await.is_err() {
+                                            // Channel is closed, exit immediately
+                                            return;
+                                        }
+                                    // Exit the reconnection loop to start using the new read_stream
+                                    break;
+                                }
+                                Err(err) => {
+                                    // Failed to reconnect, send error as Event::Other
+                                    let err = ClientError::Tungstenite(err);
+                                    if ev_tx
+                                        .send(Ok(Event::Other(OtherEvent::WSReconnectError(err))))
+                                        .await
+                                        .is_err()
+                                    {
+                                        // Channel is closed, exit immediately
+                                        return;
+                                    }
+                                }
                             }
                         }
-                    }
-                }
 
-                // If the channel was closed during reconnection attempts, exit the main loop
-                if ev_tx.is_closed() {
-                    break;
+                        // Check if the channel is closed during connection attempt
+                        _ = ev_tx.closed() => {
+                            // Channel is closed, exit immediately
+                            return;
+                        }
+                    }
                 }
             }
         });
@@ -235,7 +251,7 @@ impl<U: IntoUrl> ClientBuilder<U> {
 
         let stream = EventStream { rx_stream };
 
-        Ok((client, stream, stream_handle))
+        Ok((client, stream))
     }
 
     /// Builds a [`ComfyUIClient`] instance configured for HTTP-only
