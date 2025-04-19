@@ -111,8 +111,10 @@ impl<U: IntoUrl> ClientBuilder<U> {
     /// A tuple containing:
     /// - The [`ComfyUIClient`] for HTTP API interactions
     /// - An [`EventStream`] for receiving real-time events
-    /// - A [`JoinHandle`] for the background task that manages the WebSocket
-    ///   connection
+    ///
+    /// The WebSocket connection will be automatically closed when the
+    /// [`EventStream`] is dropped, as the background task managing the
+    /// connection terminates when the stream is no longer being consumed.
     ///
     /// Returns an error if the initial connection cannot be established.
     pub async fn build(self) -> ClientResult<(ComfyUIClient, EventStream)> {
