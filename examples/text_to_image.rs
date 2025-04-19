@@ -196,9 +196,6 @@ async fn main() {
                         warn!(event:?; "receive unknown comfy event");
                     }
                 }
-                _ => {
-                    warn!("receive unhandled comfy event");
-                }
             },
             Event::Connection(connection_event) => match connection_event {
                 ConnectionEvent::WSReconnectSuccess => {

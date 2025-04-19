@@ -76,7 +76,6 @@ pub enum Event {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
-#[non_exhaustive]
 pub enum ComfyEvent {
     /// A status event containing queue and execution information.
     Status {
