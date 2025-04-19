@@ -1,6 +1,5 @@
 use comfyui_client::{ClientBuilder, ComfyUIClient, EventStream};
 use std::sync::Once;
-use tokio::task::JoinHandle;
 
 pub fn setup() {
     static START: Once = Once::new();
@@ -11,7 +10,7 @@ pub fn setup() {
     });
 }
 
-pub async fn build_client() -> (ComfyUIClient, EventStream, JoinHandle<()>) {
+pub async fn build_client() -> (ComfyUIClient, EventStream) {
     ClientBuilder::new("http://localhost:8188")
         .build()
         .await
