@@ -186,9 +186,11 @@ async fn main() {
                 }
                 ComfyEvent::ExecutionError { data } => {
                     error!(data:?; "receive execution error event");
+                    break;
                 }
                 ComfyEvent::ExecutionInterrupted { data } => {
                     error!(data:?; "receive execution_interrupted_event");
+                    break;
                 }
                 ComfyEvent::Unknown(event) => {
                     // exclude monitoring events of `ComfyUI-Crystools` plugin
