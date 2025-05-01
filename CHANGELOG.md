@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/jmjoy/comfyui-client/compare/v0.3.0...v0.4.0) - 2025-05-01
+
+### Added
+
+- Derive Clone and add gifs in history ([#25](https://github.com/jmjoy/comfyui-client/pull/25))
+
+### Fixed
+
+- handle execution error and interruption events in main loop ([#26](https://github.com/jmjoy/comfyui-client/pull/26))
+
 ## [0.3.0](https://github.com/jmjoy/comfyui-client/compare/v0.2.0...v0.3.0) - 2025-04-19
 
 ### Other
