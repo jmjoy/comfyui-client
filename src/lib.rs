@@ -406,7 +406,7 @@ impl ComfyUIClient {
         };
         let data = match extra_data {
             Some(extra_data) => {
-                let extra_data = match extra_data.into() {
+                let extra_data = match extra_data {
                     Json::Str(extra_data) => &serde_json::from_str::<Value>(extra_data)?,
                     Json::Value(extra_data) => extra_data,
                 };
