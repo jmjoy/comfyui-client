@@ -36,7 +36,7 @@ const WORKFLOW_JSON: &str = r#"
     },
     "class_type": "VAEDecode",
     "_meta": {
-      "title": "VAE解码"
+      "title": "VAE Decode"
     }
   },
   "27": {
@@ -47,22 +47,22 @@ const WORKFLOW_JSON: &str = r#"
     },
     "class_type": "EmptySD3LatentImage",
     "_meta": {
-      "title": "空Latent图像（SD3）"
+      "title": "EmptySD3LatentImage"
     }
   },
   "30": {
     "inputs": {
-      "ckpt_name": "flux1-dev-fp8.safetensors"
+      "ckpt_name": "flux1-schnell-fp8.safetensors"
     },
     "class_type": "CheckpointLoaderSimple",
     "_meta": {
-      "title": "Checkpoint加载器（简易）"
+      "title": "Load Checkpoint"
     }
   },
   "31": {
     "inputs": {
-      "seed": 450323191819485,
-      "steps": 20,
+      "seed": 173805153958730,
+      "steps": 4,
       "cfg": 1,
       "sampler_name": "euler",
       "scheduler": "simple",
@@ -72,7 +72,7 @@ const WORKFLOW_JSON: &str = r#"
         0
       ],
       "positive": [
-        "35",
+        "6",
         0
       ],
       "negative": [
@@ -86,12 +86,18 @@ const WORKFLOW_JSON: &str = r#"
     },
     "class_type": "KSampler",
     "_meta": {
-      "title": "K采样器"
+      "title": "KSampler"
     }
   },
   "33": {
     "inputs": {
       "text": "",
+      "speak_and_recognation": {
+        "__value__": [
+          false,
+          true
+        ]
+      },
       "clip": [
         "30",
         1
@@ -100,19 +106,6 @@ const WORKFLOW_JSON: &str = r#"
     "class_type": "CLIPTextEncode",
     "_meta": {
       "title": "CLIP Text Encode (Negative Prompt)"
-    }
-  },
-  "35": {
-    "inputs": {
-      "guidance": 3.5,
-      "conditioning": [
-        "6",
-        0
-      ]
-    },
-    "class_type": "FluxGuidance",
-    "_meta": {
-      "title": "Flux引导"
     }
   },
   "38": {
@@ -124,7 +117,7 @@ const WORKFLOW_JSON: &str = r#"
     },
     "class_type": "PreviewImage",
     "_meta": {
-      "title": "预览图像"
+      "title": "Preview Image"
     }
   }
 }
@@ -143,7 +136,7 @@ async fn main() {
 
     debug!("start to queue prompt");
 
-    let prompt = client.post_prompt(WORKFLOW_JSON).await.unwrap();
+    let prompt = client.post_prompt(WORKFLOW_JSON, None).await.unwrap();
 
     info!(prompt_id:% = prompt.prompt_id; "queued prompt");
 
@@ -162,6 +155,9 @@ async fn main() {
                 }
                 ComfyEvent::Progress { data } => {
                     debug!(data:?; "receive process event");
+                }
+                ComfyEvent::ProgressState { data } => {
+                    debug!(data:?; "receive process state event");
                 }
                 ComfyEvent::Executing { data } => {
                     debug!(data:?; "receive executing event");

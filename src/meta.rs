@@ -1,7 +1,10 @@
 use crate::ClientError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    collections::HashMap,
+    fmt::{self, Debug, Display},
+};
 use tokio_tungstenite::tungstenite;
 
 /// Contains information about a prompt, including its execution details.
@@ -27,7 +30,33 @@ pub struct FileInfo {
     /// The subfolder where the file is located.
     pub subfolder: String,
     /// The type of the file.
-    pub r#type: String,
+    pub r#type: FileType,
+}
+
+/// Represents the type of file storage location in ComfyUI.
+///
+/// This enum categorizes files based on their intended use and storage location
+/// within the ComfyUI system, helping to organize and manage different types
+/// of assets used in workflows.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum FileType {
+    /// Files stored in the input directory.
+    Input,
+    /// Files stored in the temporary directory.
+    Temp,
+    /// Files stored in the output directory.
+    Output,
+}
+
+impl Display for FileType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FileType::Input => Display::fmt("input", f),
+            FileType::Temp => Display::fmt("temp", f),
+            FileType::Output => Display::fmt("output", f),
+        }
+    }
 }
 
 /// Represents a prompt with an identifier, a number, and potential node errors.
@@ -90,6 +119,17 @@ pub enum ComfyEvent {
     Progress {
         /// Data payload containing current and maximum progress values.
         data: ProgressEventData,
+    },
+    /// A progress state event containing detailed node progress information.
+    ///
+    /// This event provides comprehensive progress tracking at the node level,
+    /// including the state of individual nodes within a workflow execution.
+    /// It allows for fine-grained monitoring of workflow progress beyond
+    /// simple numeric progress values.
+    ProgressState {
+        /// Data payload containing prompt ID and detailed node state
+        /// information.
+        data: ProgressStateEventData,
     },
     /// An event indicating that a node has completed execution along with its
     /// output data.
@@ -201,6 +241,25 @@ pub struct ProgressEventData {
     pub value: usize,
     /// The maximum progress value representing the total number of steps.
     pub max: usize,
+}
+
+/// Event payload for detailed progress state information.
+///
+/// This structure contains comprehensive progress tracking information at the
+/// node level, providing detailed insights into the current state of individual
+/// nodes within a workflow execution. It extends basic progress reporting with
+/// granular node-level data.
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct ProgressStateEventData {
+    /// The prompt ID associated with this progress state, identifying the
+    /// specific workflow execution being tracked.
+    pub prompt_id: String,
+    /// A mapping of node identifiers to their current state information.
+    ///
+    /// Each entry represents a node in the workflow and its associated state
+    /// data, which can include execution status, intermediate results, or
+    /// other node-specific progress information.
+    pub nodes: HashMap<String, Value>,
 }
 
 /// Represents the output of an executed node.
@@ -362,7 +421,7 @@ pub struct ExecutionSuccessEventData {
 /// Represents a prompt that can be submitted to the ComfyUI server for
 /// execution. The prompt defines the workflow to be executed, including all
 /// nodes and their connections, as well as the input parameters for each node.
-pub enum Prompt<'a> {
+pub enum Json<'a> {
     /// A string slice representing the prompt in JSON format.
     ///
     /// Use this variant when you have a JSON string representation of the
@@ -376,21 +435,21 @@ pub enum Prompt<'a> {
     Value(&'a Value),
 }
 
-impl<'a> From<&'a str> for Prompt<'a> {
+impl<'a> From<&'a str> for Json<'a> {
     fn from(value: &'a str) -> Self {
-        Prompt::Str(value)
+        Json::Str(value)
     }
 }
 
-impl<'a> From<&'a String> for Prompt<'a> {
+impl<'a> From<&'a String> for Json<'a> {
     fn from(value: &'a String) -> Self {
-        Prompt::Str(value)
+        Json::Str(value)
     }
 }
 
-impl<'a> From<&'a Value> for Prompt<'a> {
+impl<'a> From<&'a Value> for Json<'a> {
     fn from(value: &'a Value) -> Self {
-        Prompt::Value(value)
+        Json::Value(value)
     }
 }
 
