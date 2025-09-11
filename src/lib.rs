@@ -13,7 +13,7 @@ use bytes::Bytes;
 use errors::{ApiBody, ApiError};
 use futures_util::stream::{Stream, StreamExt};
 use log::trace;
-use meta::{ComfyEvent, ConnectionEvent, Event, History, Prompt, PromptStatus};
+use meta::{ComfyEvent, ConnectionEvent, Event, History, Json, PromptStatus};
 use pin_project_lite::pin_project;
 use reqwest::{
     Body, IntoUrl, Response,
@@ -397,12 +397,25 @@ impl ComfyUIClient {
     /// # Returns
     ///
     /// A [`PromptStatus`] object on success, or an error.
-    pub async fn post_prompt(&self, prompt: impl Into<Prompt<'_>>) -> ClientResult<PromptStatus> {
+    pub async fn post_prompt(
+        &self, prompt: impl Into<Json<'_>>, extra_data: Option<Json<'_>>,
+    ) -> ClientResult<PromptStatus> {
         let prompt = match prompt.into() {
-            Prompt::Str(prompt) => &serde_json::from_str::<Value>(prompt)?,
-            Prompt::Value(prompt) => prompt,
+            Json::Str(prompt) => &serde_json::from_str::<Value>(prompt)?,
+            Json::Value(prompt) => prompt,
         };
-        let data = json!({"client_id": &self.client_id, "prompt": prompt});
+        let data = match extra_data {
+            Some(extra_data) => {
+                let extra_data = match extra_data.into() {
+                    Json::Str(extra_data) => &serde_json::from_str::<Value>(extra_data)?,
+                    Json::Value(extra_data) => extra_data,
+                };
+                json!({"client_id": &self.client_id, "prompt": prompt, "extra_data": extra_data})
+            }
+            None => {
+                json!({"client_id": &self.client_id, "prompt": prompt})
+            }
+        };
         let resp = self
             .http_client
             .post(self.base_url.join("prompt")?)
@@ -436,6 +449,7 @@ impl ComfyUIClient {
             .part("image", part)
             .text("overwrite", overwrite.to_string())
             .text("type", info.r#type.to_string());
+
         if !info.subfolder.is_empty() {
             form = form.text("subfolder", info.subfolder.to_string());
         }

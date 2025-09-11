@@ -1,7 +1,7 @@
 mod common;
 
 use bytes::Bytes;
-use comfyui_client::meta::{ComfyEvent, Event, FileInfo};
+use comfyui_client::meta::{ComfyEvent, Event, FileInfo, FileType};
 use tokio::fs::{self, File};
 use tokio_stream::StreamExt;
 
@@ -21,7 +21,7 @@ async fn test_integration() {
     let file_info = FileInfo {
         filename: "cat.webp".to_string(),
         subfolder: "".to_string(),
-        r#type: "input".to_string(),
+        r#type: FileType::Input,
     };
     let result_info = client.upload_image(file, &file_info, true).await.unwrap();
     assert_eq!(result_info, file_info);
@@ -29,7 +29,7 @@ async fn test_integration() {
     let workflow_json = fs::read_to_string("./tests/data/blur-cat-workflow.json")
         .await
         .unwrap();
-    let prompt = client.post_prompt(&workflow_json).await.unwrap();
+    let prompt = client.post_prompt(&workflow_json, None).await.unwrap();
 
     let mut image_buf = Bytes::new();
 
@@ -92,7 +92,7 @@ async fn test_integration_with_stream_ext() {
     let file_info = FileInfo {
         filename: "girl.webp".to_string(),
         subfolder: "".to_string(),
-        r#type: "input".to_string(),
+        r#type: FileType::Input,
     };
     let result_info = client.upload_image(file, &file_info, true).await.unwrap();
     assert_eq!(result_info, file_info);
@@ -100,7 +100,7 @@ async fn test_integration_with_stream_ext() {
     let workflow_json = fs::read_to_string("./tests/data/scale-girl-workflow.json")
         .await
         .unwrap();
-    client.post_prompt(&workflow_json).await.unwrap();
+    client.post_prompt(&workflow_json, None).await.unwrap();
 
     let mut files = Vec::new();
     while let Some(message) = stream.next().await {
@@ -108,5 +108,5 @@ async fn test_integration_with_stream_ext() {
     }
 
     assert_eq!(files.len(), 1);
-    assert_eq!(files[0][0].r#type, "temp");
+    assert_eq!(files[0][0].r#type, FileType::Temp);
 }
